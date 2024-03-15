@@ -36,6 +36,12 @@ struct phase_info {
   uint64_t length;
   std::vector<std::size_t> trace_index;
   std::vector<std::string> trace_names;
+
+  uint64_t snapshot_rate;
+};
+struct snapshot {
+  cpu_stats cpu;
+  cache_stats cache;
 };
 
 struct phase_stats {
@@ -44,6 +50,8 @@ struct phase_stats {
   std::vector<O3_CPU::stats_type> roi_cpu_stats, sim_cpu_stats;
   std::vector<CACHE::stats_type> roi_cache_stats, sim_cache_stats;
   std::vector<DRAM_CHANNEL::stats_type> roi_dram_stats, sim_dram_stats;
+
+  std::vector<snapshot> snapshots;
 };
 
 } // namespace champsim

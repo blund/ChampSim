@@ -44,6 +44,7 @@ int main(int argc, char** argv)
   bool knob_cloudsuite{false};
   uint64_t warmup_instructions = 0;
   uint64_t simulation_instructions = std::numeric_limits<uint64_t>::max();
+  uint64_t snapshot_rate = 100000;
   std::string json_file_name;
   std::vector<std::string> trace_names;
 
@@ -61,6 +62,8 @@ int main(int argc, char** argv)
                                          "The number of instructions in the detailed phase. If not specified, run to the end of the trace.");
   auto deprec_sim_instr_option =
       app.add_option("--simulation_instructions", simulation_instructions, "[deprecated] use --simulation-instructions instead")->excludes(sim_instr_option);
+
+  app.add_option("-s,--snapshot-rate", snapshot_rate, "How many instructions should be executed between making stat snapshots");
 
   auto json_option =
       app.add_option("--json", json_file_name, "The name of the file to receive JSON output. If no name is specified, stdout will be used")->expected(0, 1);
@@ -87,8 +90,8 @@ int main(int argc, char** argv)
       [knob_cloudsuite, repeat = simulation_given, i = uint8_t(0)](auto name) mutable { return get_tracereader(name, i++, knob_cloudsuite, repeat); });
 
   std::vector<champsim::phase_info> phases{
-      {champsim::phase_info{"Warmup", true, warmup_instructions, std::vector<std::size_t>(std::size(trace_names), 0), trace_names},
-       champsim::phase_info{"Simulation", false, simulation_instructions, std::vector<std::size_t>(std::size(trace_names), 0), trace_names}}};
+      {champsim::phase_info{"Warmup", true, warmup_instructions, std::vector<std::size_t>(std::size(trace_names), 0), trace_names, 0},
+       champsim::phase_info{"Simulation", false, simulation_instructions, std::vector<std::size_t>(std::size(trace_names), 0), trace_names, snapshot_rate}}};
 
   for (auto& p : phases)
     std::iota(std::begin(p.trace_index), std::end(p.trace_index), 0);
@@ -97,6 +100,15 @@ int main(int argc, char** argv)
              phases.at(0).length, phases.at(1).length, std::size(gen_environment.cpu_view()), PAGE_SIZE);
 
   auto phase_stats = champsim::main(gen_environment, phases, traces);
+  assert(phase_stats.size() == 1 && "We assume there is only one CPU instance");
+  /*
+  for (auto& snapshot : phase_stats[0].snapshots) {
+    puts(" -----------------------------------------------");
+    champsim::plain_printer{std::cout}.print(snapshot.cpu);
+    champsim::plain_printer{std::cout}.print(snapshot.cache);
+    puts(" -----------------------------------------------");
+  }
+  */
 
   fmt::print("\nChampSim completed all CPUs\n\n");
 

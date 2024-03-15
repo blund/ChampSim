@@ -39,8 +39,14 @@ namespace champsim
 {
 phase_stats do_phase(phase_info phase, environment& env, std::vector<tracereader>& traces)
 {
-  auto [phase_name, is_warmup, length, trace_index, trace_names] = phase;
+  auto [phase_name, is_warmup, length, trace_index, trace_names, snapshot_rate] = phase;
   auto operables = env.operable_view();
+
+  // Counts iterations of our trace, used for triggering snapshots of statistics
+  uint64_t trace_iteration_counter = 0;
+
+  phase_stats stats;
+  stats.name = phase.name;
 
   // Initialize phase
   for (champsim::operable& op : operables) {
@@ -74,11 +80,32 @@ phase_stats do_phase(phase_info phase, environment& env, std::vector<tracereader
     std::sort(std::begin(operables), std::end(operables),
               [](const champsim::operable& lhs, const champsim::operable& rhs) { return lhs.leap_operation < rhs.leap_operation; });
 
+
+    assert(env.cpu_view().size() == 1 && "The timeseries stats implementation assumes, there only is one cpu");
+
     // Read from trace
     for (O3_CPU& cpu : env.cpu_view()) {
       auto& trace = traces.at(trace_index.at(cpu.cpu));
-      for (auto pkt_count = cpu.IN_QUEUE_SIZE - static_cast<long>(std::size(cpu.input_queue)); !trace.eof() && pkt_count > 0; --pkt_count)
+
+      for (auto pkt_count = cpu.IN_QUEUE_SIZE - static_cast<long>(std::size(cpu.input_queue)); !trace.eof() && pkt_count > 0; --pkt_count) {
         cpu.input_queue.push_back(trace());
+
+	// Store snapshot of statistics
+	if (!is_warmup) {
+	  if (trace_iteration_counter++ > snapshot_rate) {
+	    auto cpu_stats = env.cpu_view()[0].get().sim_stats;
+	    auto cache_stats = env.cache_view()[0].get().sim_stats;
+
+	    // We have to manually set current instructions and cycles
+	    // since these are normally set at the end of a phase
+	    cpu_stats.end_instrs = cpu.num_retired;
+	    cpu_stats.end_cycles = cpu.current_cycle;
+
+	    stats.snapshots.push_back(snapshot{cpu_stats, cache_stats});
+	    trace_iteration_counter = 0;
+	  }
+	}
+      }
 
       // If any trace reaches EOF, terminate all phases
       if (trace.eof())
@@ -108,9 +135,6 @@ phase_stats do_phase(phase_info phase, environment& env, std::vector<tracereader
     fmt::print("{} complete CPU {} instructions: {} cycles: {} cumulative IPC: {:.4g} (Simulation time: {:%H hr %M min %S sec})\n", phase_name, cpu.cpu,
                cpu.sim_instr(), cpu.sim_cycle(), std::ceil(cpu.sim_instr()) / std::ceil(cpu.sim_cycle()), elapsed_time());
   }
-
-  phase_stats stats;
-  stats.name = phase.name;
 
   for (std::size_t i = 0; i < std::size(trace_index); ++i)
     stats.trace_names.push_back(trace_names.at(trace_index.at(i)));
