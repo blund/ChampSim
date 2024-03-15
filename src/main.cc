@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <fstream>
 #include <numeric>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -32,7 +33,8 @@
 
 namespace champsim
 {
-std::vector<phase_stats> main(environment& env, std::vector<phase_info>& phases, std::vector<tracereader>& traces);
+  std::vector<phase_stats> main(environment& env, std::vector<phase_info>& phases,
+				std::vector<tracereader>& traces, std::optional<tracereader>& replacement);
 }
 
 int main(int argc, char** argv)
@@ -47,6 +49,7 @@ int main(int argc, char** argv)
   uint64_t snapshot_rate = 100000;
   std::string json_file_name;
   std::vector<std::string> trace_names;
+  std::string replacement_trace_name;
 
   auto set_heartbeat_callback = [&](auto) {
     for (O3_CPU& cpu : gen_environment.cpu_view())
@@ -63,7 +66,9 @@ int main(int argc, char** argv)
   auto deprec_sim_instr_option =
       app.add_option("--simulation_instructions", simulation_instructions, "[deprecated] use --simulation-instructions instead")->excludes(sim_instr_option);
 
-  app.add_option("-s,--snapshot-rate", snapshot_rate, "How many instructions should be executed between making stat snapshots");
+  app.add_option("--snapshot-rate", snapshot_rate, "How many instructions should be executed between making stat snapshots");
+
+  app.add_option("--replacement-trace", replacement_trace_name, "Optional trace to use for simulation, replacing original trace");
 
   auto json_option =
       app.add_option("--json", json_file_name, "The name of the file to receive JSON output. If no name is specified, stdout will be used")->expected(0, 1);
@@ -89,6 +94,12 @@ int main(int argc, char** argv)
       std::begin(trace_names), std::end(trace_names), std::back_inserter(traces),
       [knob_cloudsuite, repeat = simulation_given, i = uint8_t(0)](auto name) mutable { return get_tracereader(name, i++, knob_cloudsuite, repeat); });
 
+  // During simulation, this trace will replace the original trace
+  std::optional<champsim::tracereader> replacement = std::nullopt;
+  if (!replacement_trace_name.empty()) {
+    replacement = get_tracereader(replacement_trace_name, 0, false, 0);
+  }
+
   std::vector<champsim::phase_info> phases{
       {champsim::phase_info{"Warmup", true, warmup_instructions, std::vector<std::size_t>(std::size(trace_names), 0), trace_names, 0},
        champsim::phase_info{"Simulation", false, simulation_instructions, std::vector<std::size_t>(std::size(trace_names), 0), trace_names, snapshot_rate}}};
@@ -99,7 +110,7 @@ int main(int argc, char** argv)
   fmt::print("\n*** ChampSim Multicore Out-of-Order Simulator ***\nWarmup Instructions: {}\nSimulation Instructions: {}\nNumber of CPUs: {}\nPage size: {}\n\n",
              phases.at(0).length, phases.at(1).length, std::size(gen_environment.cpu_view()), PAGE_SIZE);
 
-  auto phase_stats = champsim::main(gen_environment, phases, traces);
+  auto phase_stats = champsim::main(gen_environment, phases, traces, replacement);
   assert(phase_stats.size() == 1 && "We assume there is only one CPU instance");
   /*
   for (auto& snapshot : phase_stats[0].snapshots) {

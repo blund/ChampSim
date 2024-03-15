@@ -37,7 +37,8 @@ std::chrono::seconds elapsed_time() { return std::chrono::duration_cast<std::chr
 
 namespace champsim
 {
-phase_stats do_phase(phase_info phase, environment& env, std::vector<tracereader>& traces)
+phase_stats do_phase(phase_info phase, environment& env,
+		     std::vector<tracereader>& traces, std::optional<tracereader>& replacement)
 {
   auto [phase_name, is_warmup, length, trace_index, trace_names, snapshot_rate] = phase;
   auto operables = env.operable_view();
@@ -85,7 +86,11 @@ phase_stats do_phase(phase_info phase, environment& env, std::vector<tracereader
 
     // Read from trace
     for (O3_CPU& cpu : env.cpu_view()) {
-      auto& trace = traces.at(trace_index.at(cpu.cpu));
+
+      // Check to see if we should use the replacement trace for the simulation run
+      auto& trace = (!is_warmup && replacement.has_value())
+	? replacement.value()
+	: traces.at(trace_index.at(cpu.cpu));
 
       for (auto pkt_count = cpu.IN_QUEUE_SIZE - static_cast<long>(std::size(cpu.input_queue)); !trace.eof() && pkt_count > 0; --pkt_count) {
         cpu.input_queue.push_back(trace());
@@ -157,14 +162,15 @@ phase_stats do_phase(phase_info phase, environment& env, std::vector<tracereader
 }
 
 // simulation entry point
-std::vector<phase_stats> main(environment& env, std::vector<phase_info>& phases, std::vector<tracereader>& traces)
+std::vector<phase_stats> main(environment& env, std::vector<phase_info>& phases,
+				std::vector<tracereader>& traces, std::optional<tracereader>& replacement_trace)
 {
   for (champsim::operable& op : env.operable_view())
     op.initialize();
 
   std::vector<phase_stats> results;
   for (auto phase : phases) {
-    auto stats = do_phase(phase, env, traces);
+    auto stats = do_phase(phase, env, traces, replacement_trace);
     if (!phase.is_warmup)
       results.push_back(stats);
   }
