@@ -74,6 +74,19 @@ INT32 Usage()
 // Analysis routines
 /* ===================================================================== */
 
+
+ADDRINT mainModuleBase = 0;
+ADDRINT mainModuleHigh = 0;
+
+// Callback for loaded images - to find the base and high of the program, and thus calculate offsets
+VOID Image(IMG img, VOID* v) {
+  if (IMG_IsMainExecutable(img)) {
+    puts("babam");
+    mainModuleBase = IMG_LowAddress(img);
+    mainModuleHigh = IMG_HighAddress(img);
+  }
+}
+
 void ResetCurrentInstruction(VOID* ip)
 {
   curr_instr = {};
@@ -107,14 +120,42 @@ void WriteToSet(T* begin, T* end, UINT32 r)
   *found_reg = r;
 }
 
+ADDRINT addr_ring[16];
+int     ring_index = 0;
+
+void ring_add(ADDRINT addr) {
+  addr_ring[ring_index] = addr;
+  ring_index = (ring_index+1) % 16;
+}
+
+AADDRINT ring_find_last() {
+  // find the last memory load that was not the dispatch base :)
+  int ring_end = (ring_index + 1) % 16;
+  for (int i = ring_index; i % 16 != ring_end; i--) {
+    ADDRINT addr = addr_ring[i%16];
+    if (addr != dispatch_base) {
+      return addr;
+      break;
+    }
+  }
+  return 0;
+}
+
+VOID MemoryReadStoreBaseAddress(ADDRINT addr) {
+  ring_add(addr);
+}
+
 /* ===================================================================== */
 // Instrumentation callbacks
 /* ===================================================================== */
 // @BL
 UINT64 dispatch_base = 0xc0de000fe0;
-UINT64 dispatch_end  = 0xc0de001778;
 VOID CheckIfDispatch(ADDRINT base, ADDRINT opcode) {
   if (base == dispatch_base) {
+
+    // find last addr read in the ring addr:
+    ADDRINT pc = ring_find_last();
+
     switch(opcode) {
     case BC_JFORI:
     case BC_JFORL:
@@ -123,8 +164,10 @@ VOID CheckIfDispatch(ADDRINT base, ADDRINT opcode) {
     case BC_JFUNCF:
     case BC_JFUNCV:
       // We enter JIT code
+      //printf("jit - %lx\n", last_addr);
       break;
     default:
+      //printf("int - %lx\n", last_addr);
       // Normal interpreter execution
       break;
     }
@@ -138,6 +181,16 @@ VOID Instruction(INS ins, VOID* v)
   // begin each instruction with this function
   INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)ResetCurrentInstruction, IARG_INST_PTR, IARG_END);
 
+  if (INS_IsMemoryRead(ins)) {
+      REG base_reg  = INS_MemoryBaseReg(ins);
+      if(REG_valid(base_reg)) {
+	INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)MemoryReadStoreBaseAddress,
+		       IARG_REG_VALUE, base_reg,
+		       IARG_END);
+
+      }
+  }
+  
   // @BL - instrument branches to check if they are the vm jumping to the dispatch table
   if (INS_IsBranch(ins)) {
     if (INS_IsIndirectControlFlow(ins)) {
@@ -147,7 +200,6 @@ VOID Instruction(INS ins, VOID* v)
       REG index_reg = INS_MemoryIndexReg(ins);
       //UINT32 scale  = INS_MemoryScale(ins);
       if(REG_valid(base_reg) && REG_valid(index_reg)) {
-
 	INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)CheckIfDispatch,
 		       IARG_REG_VALUE, base_reg,
 		       IARG_REG_VALUE, index_reg,
@@ -223,6 +275,9 @@ int main(int argc, char* argv[])
     std::cout << "Couldn't open output trace file. Exiting." << std::endl;
     exit(1);
   }
+
+  // @BL - register function to instrument image
+  IMG_AddInstrumentFunction(Image, 0);
 
   // Register function to be called to instrument instructions
   INS_AddInstrumentFunction(Instruction, 0);
