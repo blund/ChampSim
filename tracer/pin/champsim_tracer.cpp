@@ -27,6 +27,7 @@
 
 #include "../../inc/trace_instruction.h"
 #include "pin.H"
+#include "../../../LuaJIT/src/lj_bc.h"
 
 using trace_instr_format_t = input_instr;
 
@@ -109,12 +110,52 @@ void WriteToSet(T* begin, T* end, UINT32 r)
 /* ===================================================================== */
 // Instrumentation callbacks
 /* ===================================================================== */
+// @BL
+UINT64 dispatch_base = 0xc0de000fe0;
+UINT64 dispatch_end  = 0xc0de001778;
+VOID CheckIfDispatch(ADDRINT base, ADDRINT opcode) {
+  if (base == dispatch_base) {
+    switch(opcode) {
+    case BC_JFORI:
+    case BC_JFORL:
+    case BC_JITERL:
+    case BC_JLOOP:
+    case BC_JFUNCF:
+    case BC_JFUNCV:
+      // We enter JIT code
+      break;
+    default:
+      // Normal interpreter execution
+      break;
+    }
+  }
+}
+
 
 // Is called for every instruction and instruments reads and writes
 VOID Instruction(INS ins, VOID* v)
 {
   // begin each instruction with this function
   INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)ResetCurrentInstruction, IARG_INST_PTR, IARG_END);
+
+  // @BL - instrument branches to check if they are the vm jumping to the dispatch table
+  if (INS_IsBranch(ins)) {
+    if (INS_IsIndirectControlFlow(ins)) {
+      // Effective address = Displacement + BaseReg + IndexReg * Scale
+      // We just need base and index, since they correspond to dispatch table and opcode :)
+      REG base_reg  = INS_MemoryBaseReg(ins);
+      REG index_reg = INS_MemoryIndexReg(ins);
+      //UINT32 scale  = INS_MemoryScale(ins);
+      if(REG_valid(base_reg) && REG_valid(index_reg)) {
+
+	INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)CheckIfDispatch,
+		       IARG_REG_VALUE, base_reg,
+		       IARG_REG_VALUE, index_reg,
+		       //IARG_UINT64,    scale,
+		       IARG_END);
+      }
+    }
+  }
 
   // instrument branch instructions
   if (INS_IsBranch(ins))

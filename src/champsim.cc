@@ -99,7 +99,12 @@ phase_stats do_phase(phase_info phase, environment& env,
 	if (!is_warmup) {
 	  if (trace_iteration_counter++ > snapshot_rate) {
 	    auto cpu_stats = env.cpu_view()[0].get().sim_stats;
-	    auto cache_stats = env.cache_view()[0].get().sim_stats;
+
+	    std::vector<cache_stats> cache_stats;
+	    for (auto& cache : env.cache_view()) {
+	      auto cache_stat = cache.get().sim_stats;
+	      cache_stats.push_back(cache_stat);
+	    }
 
 	    // We have to manually set current instructions and cycles
 	    // since these are normally set at the end of a phase
@@ -174,6 +179,8 @@ std::vector<phase_stats> main(environment& env, std::vector<phase_info>& phases,
     if (!phase.is_warmup)
       results.push_back(stats);
   }
+
+  results[0].snapshots.push_back(snapshot{results[0].sim_cpu_stats[0], results[0].sim_cache_stats});
 
   return results;
 }

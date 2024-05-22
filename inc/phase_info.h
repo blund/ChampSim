@@ -41,7 +41,7 @@ struct phase_info {
 };
 struct snapshot {
   cpu_stats cpu;
-  cache_stats cache;
+  std::vector<cache_stats> cache;
 };
 
 struct phase_stats {
