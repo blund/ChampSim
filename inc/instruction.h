@@ -55,7 +55,7 @@ struct ooo_model_instr {
   bool branch_prediction = 0;
   bool branch_mispredicted = 0; // A branch can be mispredicted even if the direction prediction is correct when the predicted target is not correct
 
-  interpreter_state int_state;
+  interpreter_state int_state = ERR; // @BL - if parsing fails, it should show up as -1 by default
   
   std::array<uint8_t, 2> asid = {std::numeric_limits<uint8_t>::max(), std::numeric_limits<uint8_t>::max()};
 

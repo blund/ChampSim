@@ -35,6 +35,8 @@ auto start_time = std::chrono::steady_clock::now();
 
 std::chrono::seconds elapsed_time() { return std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - start_time); }
 
+
+interpreter_state int_state = IRRELEVANT;
 namespace champsim
 {
 phase_stats do_phase(phase_info phase, environment& env,
@@ -95,11 +97,11 @@ phase_stats do_phase(phase_info phase, environment& env,
       for (auto pkt_count = cpu.IN_QUEUE_SIZE - static_cast<long>(std::size(cpu.input_queue)); !trace.eof() && pkt_count > 0; --pkt_count) {
         cpu.input_queue.push_back(trace());
 
-	//auto instr = cpu.input_queue.back();
 	auto instr = cpu.input_queue.back();
 
-	if (instr.int_state == 2) {
-	  // @BL - slik kan vi lese int_state
+	if (instr.int_state && instr.int_state != int_state) {
+	  printf(" -- switching state to %d\n", int_state);
+	  int_state = instr.int_state;
 	}
 	
 	// Store snapshot of statistics

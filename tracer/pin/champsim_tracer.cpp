@@ -98,7 +98,7 @@ void ResetCurrentInstruction(VOID* ip)
 {
   curr_instr = {};
   curr_instr.ip = (unsigned long long int)ip;
-  curr_instr.int_state = ERR;
+  curr_instr.int_state = IRRELEVANT;
 }
 
 BOOL ShouldWrite()
