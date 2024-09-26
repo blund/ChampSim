@@ -41,6 +41,8 @@ std::ofstream outfile;
 
 trace_instr_format_t curr_instr;
 
+ADDRINT base_address;
+
 /* ===================================================================== */
 // Command line switches
 /* ===================================================================== */
@@ -83,22 +85,11 @@ VOID RegisterTraceStart(ADDRINT address) {
 
 VOID Image(IMG img, VOID* v)
 {
-  // Instrument the malloc() and free() functions.  Print the input argument
-  // of each malloc() or free(), and the return value of malloc().
-  //
-  //  Find the malloc() function.
-
-  // @BL - NOTE that for a function to be traced it must not be inlined...
-  const char* func = "lj_dispatch_call"; // @BL - this function is called from interpreter to start tracing
-  RTN rtn = RTN_FindByName(img, func);
-  if (RTN_Valid(rtn))
-    {
-
-      // @BL - insert 
-      RTN_Open(rtn);
-      RTN_InsertCall(rtn, IPOINT_BEFORE, (AFUNPTR)RegisterTraceStart, IARG_ADDRINT, RTN_Address(rtn), IARG_END);
-      RTN_Close(rtn);
-    }
+  // Store base address so we can identitify addresses
+  if (IMG_IsMainExecutable(img)) {
+    base_address = IMG_LowAddress(img);
+    printf("based address: %lx\n", base_address);
+  }
 }
 
 
@@ -187,13 +178,20 @@ VOID CheckIfDispatch(ADDRINT base, ADDRINT opcode) {
     default:
       // Normal interpreter execution
       assert(opcode >= 0 && opcode <= 243); // Make sure the opcode is actually an opcode!
-      puts(" [tracer] - setting mode to INTERPRETER");
+      //puts(" [tracer] - setting mode to INTERPRETER");
       curr_instr.int_state = INTERPRETER;
       break;
     }
   }
 }
 
+VOID DetectedTracing(ADDRINT ip)
+{
+  puts(" [tracer] - setting mode to TRACING");
+  curr_instr.int_state = TRACING;
+}
+
+ADDRINT target_address = 0x000000ec30;
 
 // Is called for every instruction and instruments reads and writes
 VOID Instruction(INS ins, VOID* v)
@@ -201,6 +199,12 @@ VOID Instruction(INS ins, VOID* v)
   // begin each instruction with this function
   INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)ResetCurrentInstruction, IARG_INST_PTR, IARG_END);
 
+  if (INS_Address(ins) == base_address+target_address) {
+    INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)DetectedTracing,
+		   IARG_INST_PTR,  // Instruction pointer (address)
+		   IARG_END);
+  }
+  
   if (INS_IsMemoryRead(ins)) {
       REG base_reg  = INS_MemoryBaseReg(ins);
       if(REG_valid(base_reg)) {
@@ -289,6 +293,7 @@ int main(int argc, char* argv[])
   // in the command line or the command line is invalid
 
   PIN_InitSymbols();
+
   if (PIN_Init(argc, argv))
     return Usage();
 
