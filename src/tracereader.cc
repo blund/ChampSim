@@ -53,8 +53,12 @@ champsim::tracereader get_tracereader_for_type(std::string fname, uint8_t cpu)
 template <typename T, typename S>
 using repeatable_reader_t = champsim::repeatable<champsim::bulk_tracereader<T, S>, uint8_t, std::string>;
 
-champsim::tracereader get_tracereader(std::string fname, uint8_t cpu, bool is_cloudsuite, bool repeat)
+champsim::tracereader get_tracereader(std::string fname, uint8_t cpu, bool is_cloudsuite, bool is_luajit, bool repeat)
 {
+  if (is_luajit) {
+    return champsim::get_tracereader_for_type<repeatable_reader_t, luajit_instr>(fname, cpu);
+  }
+
   if (is_cloudsuite) {
     if (repeat)
       return champsim::get_tracereader_for_type<repeatable_reader_t, cloudsuite_instr>(fname, cpu);

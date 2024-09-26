@@ -29,7 +29,7 @@
 #include "pin.H"
 #include "../../../LuaJIT/src/lj_bc.h"
 
-using trace_instr_format_t = input_instr;
+using trace_instr_format_t = luajit_instr;
 
 /* ================================================================== */
 // Global variables
@@ -74,23 +74,40 @@ INT32 Usage()
 // Analysis routines
 /* ===================================================================== */
 
-
-ADDRINT mainModuleBase = 0;
-ADDRINT mainModuleHigh = 0;
-
 // Callback for loaded images - to find the base and high of the program, and thus calculate offsets
-VOID Image(IMG img, VOID* v) {
-  if (IMG_IsMainExecutable(img)) {
-    puts("babam");
-    mainModuleBase = IMG_LowAddress(img);
-    mainModuleHigh = IMG_HighAddress(img);
-  }
+
+VOID RegisterTraceStart(ADDRINT address) {
+  puts(" [tracer] - setting mode to TRACING");
+  curr_instr.int_state = TRACING;
 }
+
+VOID Image(IMG img, VOID* v)
+{
+  // Instrument the malloc() and free() functions.  Print the input argument
+  // of each malloc() or free(), and the return value of malloc().
+  //
+  //  Find the malloc() function.
+
+  // @BL - NOTE that for a function to be traced it must not be inlined...
+  const char* func = "lj_dispatch_call"; // @BL - this function is called from interpreter to start tracing
+  RTN rtn = RTN_FindByName(img, func);
+  if (RTN_Valid(rtn))
+    {
+
+      // @BL - insert 
+      RTN_Open(rtn);
+      RTN_InsertCall(rtn, IPOINT_BEFORE, (AFUNPTR)RegisterTraceStart, IARG_ADDRINT, RTN_Address(rtn), IARG_END);
+      RTN_Close(rtn);
+    }
+}
+
+
 
 void ResetCurrentInstruction(VOID* ip)
 {
   curr_instr = {};
   curr_instr.ip = (unsigned long long int)ip;
+  curr_instr.int_state = ERR;
 }
 
 BOOL ShouldWrite()
@@ -121,25 +138,14 @@ void WriteToSet(T* begin, T* end, UINT32 r)
 }
 
 ADDRINT addr_ring[16];
-int     ring_index = 0;
+int ring_index = 0;
 
 void ring_add(ADDRINT addr) {
   addr_ring[ring_index] = addr;
   ring_index = (ring_index+1) % 16;
+  //printf(" - %d\n", ring_index);
 }
 
-AADDRINT ring_find_last() {
-  // find the last memory load that was not the dispatch base :)
-  int ring_end = (ring_index + 1) % 16;
-  for (int i = ring_index; i % 16 != ring_end; i--) {
-    ADDRINT addr = addr_ring[i%16];
-    if (addr != dispatch_base) {
-      return addr;
-      break;
-    }
-  }
-  return 0;
-}
 
 VOID MemoryReadStoreBaseAddress(ADDRINT addr) {
   ring_add(addr);
@@ -151,10 +157,21 @@ VOID MemoryReadStoreBaseAddress(ADDRINT addr) {
 // @BL
 UINT64 dispatch_base = 0xc0de000fe0;
 VOID CheckIfDispatch(ADDRINT base, ADDRINT opcode) {
+  // @BL(TODO) - ensure that the ring buffer works correctly....
   if (base == dispatch_base) {
 
     // find last addr read in the ring addr:
-    ADDRINT pc = ring_find_last();
+    //ADDRINT last_addr;
+    int ring_end = (ring_index + 1) % 16;
+    for (int i = ring_index; i % 16 != ring_end; i--) {
+      //printf(" -- %d, %d\n", i, ring_end);
+      ADDRINT addr = addr_ring[i%16];
+      if (addr != dispatch_base) {
+	//printf("%lx\n", addr);
+	//puts("bom!");
+	break;
+      }
+    }
 
     switch(opcode) {
     case BC_JFORI:
@@ -163,12 +180,15 @@ VOID CheckIfDispatch(ADDRINT base, ADDRINT opcode) {
     case BC_JLOOP:
     case BC_JFUNCF:
     case BC_JFUNCV:
-      // We enter JIT code
-      //printf("jit - %lx\n", last_addr);
+      // JIT code will be executed
+      puts(" [tracer] - setting mode to JIT");
+      curr_instr.int_state = JIT;
       break;
     default:
-      //printf("int - %lx\n", last_addr);
       // Normal interpreter execution
+      assert(opcode >= 0 && opcode <= 243); // Make sure the opcode is actually an opcode!
+      puts(" [tracer] - setting mode to INTERPRETER");
+      curr_instr.int_state = INTERPRETER;
       break;
     }
   }
@@ -267,6 +287,8 @@ int main(int argc, char* argv[])
 {
   // Initialize PIN library. Print help message if -h(elp) is specified
   // in the command line or the command line is invalid
+
+  PIN_InitSymbols();
   if (PIN_Init(argc, argv))
     return Usage();
 

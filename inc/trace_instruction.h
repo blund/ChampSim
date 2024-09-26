@@ -18,6 +18,13 @@
 #define TRACE_INSTRUCTION_H
 
 #include <limits>
+enum interpreter_state {
+  ERR  = -1,
+  IRRELEVANT  = 0,
+  INTERPRETER = 1,
+  JIT         = 2,
+  TRACING     = 3,
+};
 
 // special registers that help us identify branches
 namespace champsim
@@ -62,6 +69,23 @@ struct cloudsuite_instr {
   unsigned long long source_memory[NUM_INSTR_SOURCES];                 // input memory
 
   unsigned char asid[2];
+};
+
+struct luajit_instr {
+  // instruction pointer or PC (Program Counter)
+  unsigned long long ip;
+
+  // branch info
+  unsigned char is_branch;
+  unsigned char branch_taken;
+
+  unsigned char destination_registers[NUM_INSTR_DESTINATIONS]; // output registers
+  unsigned char source_registers[NUM_INSTR_SOURCES];           // input registers
+
+  unsigned long long destination_memory[NUM_INSTR_DESTINATIONS]; // output memory
+  unsigned long long source_memory[NUM_INSTR_SOURCES];           // input memory
+
+  interpreter_state int_state;
 };
 
 #endif

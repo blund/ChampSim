@@ -95,6 +95,13 @@ phase_stats do_phase(phase_info phase, environment& env,
       for (auto pkt_count = cpu.IN_QUEUE_SIZE - static_cast<long>(std::size(cpu.input_queue)); !trace.eof() && pkt_count > 0; --pkt_count) {
         cpu.input_queue.push_back(trace());
 
+	//auto instr = cpu.input_queue.back();
+	auto instr = cpu.input_queue.back();
+
+	if (instr.int_state == 2) {
+	  // @BL - slik kan vi lese int_state
+	}
+	
 	// Store snapshot of statistics
 	if (!is_warmup) {
 	  if (trace_iteration_counter++ > snapshot_rate) {
@@ -173,6 +180,8 @@ std::vector<phase_stats> main(environment& env, std::vector<phase_info>& phases,
   for (champsim::operable& op : env.operable_view())
     op.initialize();
 
+  // @BL - her vil vi endre så vi lager nye phases når vi svitsjer modus, i stedet for å ha en forutbestemt
+  // antall faser vi skal igjennom.
   std::vector<phase_stats> results;
   for (auto phase : phases) {
     auto stats = do_phase(phase, env, traces, replacement_trace);
@@ -184,4 +193,5 @@ std::vector<phase_stats> main(environment& env, std::vector<phase_info>& phases,
 
   return results;
 }
+
 } // namespace champsim

@@ -89,18 +89,22 @@ int main(int argc, char** argv)
   if (deprec_sim_instr_option->count() > 0)
     fmt::print("WARNING: option --simulation_instructions is deprecated. Use --simulation-instructions instead.\n");
 
+
+  // @BL
+  bool is_luajit = true;
+ 
   if (simulation_given && !warmup_given)
     warmup_instructions = simulation_instructions * 2 / 10;
 
   std::vector<champsim::tracereader> traces;
   std::transform(
       std::begin(trace_names), std::end(trace_names), std::back_inserter(traces),
-      [knob_cloudsuite, repeat = simulation_given, i = uint8_t(0)](auto name) mutable { return get_tracereader(name, i++, knob_cloudsuite, repeat); });
+      [knob_cloudsuite, is_luajit, repeat = simulation_given, i = uint8_t(0)](auto name) mutable { return get_tracereader(name, i++, knob_cloudsuite, is_luajit, repeat); });
 
   // During simulation, this trace will replace the original trace
   std::optional<champsim::tracereader> replacement = std::nullopt;
   if (!replacement_trace_name.empty()) {
-    replacement = get_tracereader(replacement_trace_name, 0, false, 0);
+    replacement = get_tracereader(replacement_trace_name, 0, false, true, 0);
   }
 
   std::vector<champsim::phase_info> phases{
@@ -114,6 +118,8 @@ int main(int argc, char** argv)
   fmt::print("\n*** ChampSim Multicore Out-of-Order Simulator ***\nWarmup Instructions: {}\nSimulation Instructions: {}\nNumber of CPUs: {}\nPage size: {}\n\n",
              phases.at(0).length, phases.at(1).length, std::size(gen_environment.cpu_view()), PAGE_SIZE);
 
+  // @BL - her får vi ut en vektor av phase stats, som består i alle fasene vi har kjørt gjennom
+  // programmets kjøretid
   std::vector<champsim::phase_stats> phase_stats = champsim::main(gen_environment, phases, traces, replacement);
   assert(phase_stats.size() == 1 && "We assume there is only one CPU instance");
 
