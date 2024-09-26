@@ -129,6 +129,9 @@ int main(int argc, char** argv)
 
   std::cout << "Current path is " << std::filesystem::current_path() << '\n';
   std::ofstream cpu_file{"cpu_stats.csv"};
+
+  printf("snapshot len: %ld\n", phase_stats[0].snapshots.size());
+
   for (auto& snapshot : phase_stats[0].snapshots) {
     auto stats = snapshot.cpu;
     std::array<std::pair<std::string, std::size_t>, 6> types{
@@ -172,6 +175,8 @@ int main(int argc, char** argv)
 
   std::ofstream cache_file{"cache_stats.csv"};
   for (auto& snapshot : phase_stats[0].snapshots) {
+    cache_file << snapshot.state;
+    cache_file << ",";
     for (auto& stats : snapshot.cache) {
 
       constexpr std::array<std::pair<std::string_view, std::size_t>, 5> types{

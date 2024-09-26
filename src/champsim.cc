@@ -89,6 +89,7 @@ phase_stats do_phase(phase_info phase, environment& env,
     // Read from trace
     for (O3_CPU& cpu : env.cpu_view()) {
 
+      int state_changed = 0;
       // Check to see if we should use the replacement trace for the simulation run
       auto& trace = (!is_warmup && replacement.has_value())
 	? replacement.value()
@@ -100,28 +101,28 @@ phase_stats do_phase(phase_info phase, environment& env,
 	auto instr = cpu.input_queue.back();
 
 	if (instr.int_state && instr.int_state != int_state) {
-	  printf(" -- switching state to %d\n", int_state);
+	  //printf(" -- switching state to %d\n", int_state);
 	  int_state = instr.int_state;
+	  state_changed = 1;
 	}
 	
 	// Store snapshot of statistics
 	if (!is_warmup) {
-	  if (trace_iteration_counter++ > snapshot_rate) {
-	    auto cpu_stats = env.cpu_view()[0].get().sim_stats;
+	  auto cpu_stats = env.cpu_view()[0].get().sim_stats;
 
-	    std::vector<cache_stats> cache_stats;
-	    for (auto& cache : env.cache_view()) {
-	      auto cache_stat = cache.get().sim_stats;
-	      cache_stats.push_back(cache_stat);
-	    }
+	  std::vector<cache_stats> cache_stats;
+	  for (auto& cache : env.cache_view()) {
+	    auto cache_stat = cache.get().sim_stats;
+	    cache_stats.push_back(cache_stat);
+	  }
 
+	  if (state_changed) {
 	    // We have to manually set current instructions and cycles
 	    // since these are normally set at the end of a phase
 	    cpu_stats.end_instrs = cpu.num_retired;
 	    cpu_stats.end_cycles = cpu.current_cycle;
-
-	    stats.snapshots.push_back(snapshot{cpu_stats, cache_stats});
-	    trace_iteration_counter = 0;
+	    state_changed = 0;
+	    stats.snapshots.push_back(snapshot{int_state, cpu_stats, cache_stats});
 	  }
 	}
       }
@@ -172,6 +173,7 @@ phase_stats do_phase(phase_info phase, environment& env,
   std::transform(std::begin(dram.channels), std::end(dram.channels), std::back_inserter(stats.roi_dram_stats),
                  [](const DRAM_CHANNEL& chan) { return chan.roi_stats; });
 
+  printf(" -- snapshots before returning: %ld\n", stats.snapshots.size());
   return stats;
 }
 
@@ -191,7 +193,7 @@ std::vector<phase_stats> main(environment& env, std::vector<phase_info>& phases,
       results.push_back(stats);
   }
 
-  results[0].snapshots.push_back(snapshot{results[0].sim_cpu_stats[0], results[0].sim_cache_stats});
+  results[0].snapshots.push_back(snapshot{IRRELEVANT, results[0].sim_cpu_stats[0], results[0].sim_cache_stats});
 
   return results;
 }

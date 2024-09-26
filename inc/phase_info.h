@@ -40,6 +40,8 @@ struct phase_info {
   uint64_t snapshot_rate;
 };
 struct snapshot {
+
+  interpreter_state state;
   cpu_stats cpu;
   std::vector<cache_stats> cache;
 };
