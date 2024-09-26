@@ -79,7 +79,7 @@ INT32 Usage()
 // Callback for loaded images - to find the base and high of the program, and thus calculate offsets
 
 VOID RegisterTraceStart(ADDRINT address) {
-  puts(" [tracer] - setting mode to TRACING");
+  //puts(" [tracer] - setting mode to TRACING");
   curr_instr.int_state = TRACING;
 }
 
@@ -187,7 +187,7 @@ VOID CheckIfDispatch(ADDRINT base, ADDRINT opcode) {
 
 VOID DetectedTracing(ADDRINT ip)
 {
-  puts(" [tracer] - setting mode to TRACING");
+  //puts(" [tracer] - setting mode to TRACING");
   curr_instr.int_state = TRACING;
 }
 
