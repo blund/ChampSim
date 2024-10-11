@@ -37,6 +37,7 @@ std::chrono::seconds elapsed_time() { return std::chrono::duration_cast<std::chr
 
 
 interpreter_state int_state = IRRELEVANT;
+interpreter_state last_int_state = IRRELEVANT;
 namespace champsim
 {
 phase_stats do_phase(phase_info phase, environment& env,
@@ -102,6 +103,7 @@ phase_stats do_phase(phase_info phase, environment& env,
 
 	if (instr.int_state && instr.int_state != int_state) {
 	  //printf(" -- switching state to %d\n", int_state);
+	  last_int_state = int_state;
 	  int_state = instr.int_state;
 	  state_changed = 1;
 	}
@@ -122,7 +124,7 @@ phase_stats do_phase(phase_info phase, environment& env,
 	    cpu_stats.end_instrs = cpu.num_retired;
 	    cpu_stats.end_cycles = cpu.current_cycle;
 	    state_changed = 0;
-	    stats.snapshots.push_back(snapshot{int_state, cpu_stats, cache_stats});
+	    stats.snapshots.push_back(snapshot{last_int_state, cpu_stats, cache_stats});
 	  }
 	}
       }

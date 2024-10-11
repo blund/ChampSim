@@ -43,6 +43,18 @@ struct snapshot {
 
   interpreter_state state;
   cpu_stats cpu;
+
+    /*
+      @BL - NOTE! 
+      There are always 7 entries in the cache array, with the indexes corresponding to:
+      6 - LLC
+      5 - cpu0_DTLB
+      4 - cpu0_ITLB
+      3 - cpu0_L1D
+      2 - cpu0_L1I
+      1 - cpu0_L2C
+      0 - cpu0_STLB
+      */
   std::vector<cache_stats> cache;
 };
 

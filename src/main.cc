@@ -116,7 +116,7 @@ int main(int argc, char** argv)
 
   
   fmt::print("\n*** ChampSim Multicore Out-of-Order Simulator ***\nWarmup Instructions: {}\nSimulation Instructions: {}\nNumber of CPUs: {}\nPage size: {}\n\n",
-             phases.at(0).length, phases.at(1).length, std::size(gen_environment.cpu_view()), PAGE_SIZE);
+	   phases.at(0).length, phases.at(1).length, std::size(gen_environment.cpu_view()), PAGE_SIZE);
 
   // @BL - her får vi ut en vektor av phase stats, som består i alle fasene vi har kjørt gjennom
   // programmets kjøretid
@@ -126,7 +126,45 @@ int main(int argc, char** argv)
   printf("Caches in phase_stats: %ld\n", phase_stats[0].roi_cache_stats.size());
   printf("CPUs in phase_stats: %ld\n", phase_stats[0].roi_cpu_stats.size());
 
+  printf("cache_stats len = %ld\n", phase_stats[0].snapshots[0].cache.size());
 
+  std::ofstream output_file{"test-stats.csv"};
+  for (auto& snapshot : phase_stats[0].snapshots) {
+    cpu_stats                cpu_stats   = snapshot.cpu;
+    std::vector<cache_stats> cache_stats = snapshot.cache;
+
+    constexpr std::array<std::pair<std::string_view, std::size_t>, 5> types{
+      {std::pair{"LOAD", champsim::to_underlying(access_type::LOAD)}, std::pair{"RFO", champsim::to_underlying(access_type::RFO)},
+       std::pair{"PREFETCH", champsim::to_underlying(access_type::PREFETCH)}, std::pair{"WRITE", champsim::to_underlying(access_type::WRITE)},
+       std::pair{"TRANSLATION", champsim::to_underlying(access_type::TRANSLATION)}}};
+
+
+    uint64_t TOTAL_HIT = 0, TOTAL_MISS = 0;
+    for (const auto& type : types) {
+      TOTAL_HIT  += cache_stats[4].hits.at(type.second).at(0);
+      TOTAL_MISS += cache_stats[4].misses.at(type.second).at(0);
+    }
+
+    // Which state interpreter had for this section
+    output_file << snapshot.state;
+    output_file << ",";
+
+    // How many instrs this section held
+    output_file << cpu_stats.instrs();
+    output_file << ",";
+
+    // How many pfrs were done in this section
+    output_file << cache_stats[3].pf_requested;
+    output_file << ",";
+    output_file << cache_stats[4].pf_requested;
+    output_file << ",";
+
+    output_file << "\n";
+
+   }
+  output_file.close();
+
+/*
   std::cout << "Current path is " << std::filesystem::current_path() << '\n';
   std::ofstream cpu_file{"cpu_stats.csv"};
 
@@ -172,7 +210,11 @@ int main(int argc, char** argv)
     cpu_file << "\n";
   }
   cpu_file.close();
+  */
 
+
+  /*
+  
   std::ofstream cache_file{"cache_stats.csv"};
   for (auto& snapshot : phase_stats[0].snapshots) {
     cache_file << snapshot.state;
@@ -188,7 +230,7 @@ int main(int argc, char** argv)
       for (std::size_t cpu = 0; cpu < NUM_CPUS; ++cpu) {
 	uint64_t TOTAL_HIT = 0, TOTAL_MISS = 0;
 	for (const auto& type : types) {
-	  TOTAL_HIT += stats.hits.at(type.second).at(cpu);
+	  TOTAL_HIT  += stats.hits.at(type.second).at(cpu);
 	  TOTAL_MISS += stats.misses.at(type.second).at(cpu);
 	}
 
@@ -201,7 +243,7 @@ int main(int argc, char** argv)
 	cache_file << ",";
 	cache_file << TOTAL_MISS;
 	cache_file << ",";
-    
+
 	for (const auto& type : types) {
 	  //cache_file << type.first;
 	  //cache_file << ",";
@@ -232,6 +274,7 @@ int main(int argc, char** argv)
     cache_file << "\n";
   }
   cache_file.close();
+*/
 
   fmt::print("\nChampSim completed all CPUs\n\n");
 
