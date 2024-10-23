@@ -40,6 +40,24 @@ namespace champsim
 				std::vector<tracereader>& traces, std::optional<tracereader>& replacement);
 }
 
+uint64_t get_fetch_packet_count(int index, std::vector<cache_stats> cache_stats) {
+  constexpr std::array<std::pair<std::string_view, std::size_t>, 5> types{
+    {std::pair{"LOAD", champsim::to_underlying(access_type::LOAD)}, std::pair{"RFO", champsim::to_underlying(access_type::RFO)},
+     std::pair{"PREFETCH", champsim::to_underlying(access_type::PREFETCH)}, std::pair{"WRITE", champsim::to_underlying(access_type::WRITE)},
+     std::pair{"TRANSLATION", champsim::to_underlying(access_type::TRANSLATION)}}};
+
+  uint64_t TOTAL_ACCESS = 0, TOTAL_HIT = 0, TOTAL_MISS = 0;
+  for (const auto& type : types) {
+    TOTAL_HIT  += cache_stats[index].hits.at(type.second).at(0);
+    TOTAL_MISS += cache_stats[index].misses.at(type.second).at(0);
+  }
+  TOTAL_ACCESS = TOTAL_HIT + TOTAL_MISS;
+  uint64_t fetch_packets = TOTAL_ACCESS - cache_stats[index].pf_requested;
+
+
+  return fetch_packets;
+}
+
 int main(int argc, char** argv)
 {
   champsim::configured::generated_environment gen_environment{};
@@ -53,15 +71,20 @@ int main(int argc, char** argv)
   std::string json_file_name;
   std::vector<std::string> trace_names;
   std::string replacement_trace_name;
+  std::string output_path = "stats.csv";
 
   auto set_heartbeat_callback = [&](auto) {
     for (O3_CPU& cpu : gen_environment.cpu_view())
       cpu.show_heartbeat = false;
   };
 
+
   app.add_flag("-c,--cloudsuite", knob_cloudsuite, "Read all traces using the cloudsuite format");
   app.add_flag("--hide-heartbeat", set_heartbeat_callback, "Hide the heartbeat output");
   auto warmup_instr_option = app.add_option("-w,--warmup-instructions", warmup_instructions, "The number of instructions in the warmup phase");
+
+  app.add_option("--output", output_path, "Where the resulting csv should be output.");
+
   auto deprec_warmup_instr_option =
       app.add_option("--warmup_instructions", warmup_instructions, "[deprecated] use --warmup-instructions instead")->excludes(warmup_instr_option);
   auto sim_instr_option = app.add_option("-i,--simulation-instructions", simulation_instructions,
@@ -128,22 +151,11 @@ int main(int argc, char** argv)
 
   printf("cache_stats len = %ld\n", phase_stats[0].snapshots[0].cache.size());
 
-  std::ofstream output_file{"test-stats.csv"};
+  std::ofstream output_file{output_path};
   for (auto& snapshot : phase_stats[0].snapshots) {
     cpu_stats                cpu_stats   = snapshot.cpu;
     std::vector<cache_stats> cache_stats = snapshot.cache;
 
-    constexpr std::array<std::pair<std::string_view, std::size_t>, 5> types{
-      {std::pair{"LOAD", champsim::to_underlying(access_type::LOAD)}, std::pair{"RFO", champsim::to_underlying(access_type::RFO)},
-       std::pair{"PREFETCH", champsim::to_underlying(access_type::PREFETCH)}, std::pair{"WRITE", champsim::to_underlying(access_type::WRITE)},
-       std::pair{"TRANSLATION", champsim::to_underlying(access_type::TRANSLATION)}}};
-
-
-    uint64_t TOTAL_HIT = 0, TOTAL_MISS = 0;
-    for (const auto& type : types) {
-      TOTAL_HIT  += cache_stats[4].hits.at(type.second).at(0);
-      TOTAL_MISS += cache_stats[4].misses.at(type.second).at(0);
-    }
 
     // Which state interpreter had for this section
     output_file << snapshot.state;
@@ -153,12 +165,37 @@ int main(int argc, char** argv)
     output_file << cpu_stats.instrs();
     output_file << ",";
 
+    // L1i fetch packets
+    output_file << get_fetch_packet_count(champsim::CACHE_TYPES::L1I, cache_stats);
+    output_file << ",";
+
+    // L1i fetch packets
+    output_file << get_fetch_packet_count(champsim::CACHE_TYPES::L1D, cache_stats);
+    output_file << ",";
+    
+    /*
     // How many pfrs were done in this section
     output_file << cache_stats[3].pf_requested;
     output_file << ",";
-    output_file << cache_stats[4].pf_requested;
+    output_file << cache_stats[3].pf_useless;
     output_file << ",";
 
+    output_file << cache_stats[4].pf_requested;
+    output_file << ",";
+    output_file << cache_stats[4].pf_useless;
+    output_file << ",";
+
+    output_file << cpu_stats.l1d_fetch_packet_count;
+    output_file << ",";
+
+    output_file << cpu_stats.l1i_fetch_packet_count;
+    output_file << ",";
+
+    output_file << cpu_stats.btb_fetch_packet_count;
+    output_file << ",";
+
+    */
+    
     output_file << "\n";
 
    }

@@ -46,9 +46,6 @@ phase_stats do_phase(phase_info phase, environment& env,
   auto [phase_name, is_warmup, length, trace_index, trace_names, snapshot_rate] = phase;
   auto operables = env.operable_view();
 
-  // Counts iterations of our trace, used for triggering snapshots of statistics
-  uint64_t trace_iteration_counter = 0;
-
   phase_stats stats;
   stats.name = phase.name;
 

@@ -46,6 +46,7 @@ ADDRINT base_address;
 /* ===================================================================== */
 // Command line switches
 /* ===================================================================== */
+//KNOB<std::string> KnobOutputFile(KNOB_MODE_WRITEONCE, "pintool", "o", "/home/blund/master/prosjekt/traces/champsim.trace", "specify file name for Champsim tracer output");
 KNOB<std::string> KnobOutputFile(KNOB_MODE_WRITEONCE, "pintool", "o", "champsim.trace", "specify file name for Champsim tracer output");
 
 KNOB<UINT64> KnobSkipInstructions(KNOB_MODE_WRITEONCE, "pintool", "s", "0", "How many instructions to skip before tracing begins");
@@ -88,7 +89,7 @@ VOID Image(IMG img, VOID* v)
   // Store base address so we can identitify addresses
   if (IMG_IsMainExecutable(img)) {
     base_address = IMG_LowAddress(img);
-    printf("based address: %lx\n", base_address);
+    //printf("based address: %lx\n", base_address);
   }
 }
 
@@ -172,7 +173,7 @@ VOID CheckIfDispatch(ADDRINT base, ADDRINT opcode) {
     case BC_JFUNCF:
     case BC_JFUNCV:
       // JIT code will be executed
-      puts(" [tracer] - setting mode to JIT");
+      //puts(" [tracer] - setting mode to JIT");
       curr_instr.int_state = JIT;
       break;
     default:
