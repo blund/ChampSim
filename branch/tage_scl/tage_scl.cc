@@ -27,6 +27,7 @@
  */
 
 #include "tage_scl.h"
+#include "tage.h"
 
 #include "counters.h"
 #include "common.h"

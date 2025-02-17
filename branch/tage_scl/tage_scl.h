@@ -39,7 +39,7 @@
 #include <sstream>
 #include <vector>
 
-#include "tage_impl.h"
+#include "tage.h"
 
 //----------------------
 // #define TAGEInf
