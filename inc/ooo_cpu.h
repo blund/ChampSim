@@ -32,6 +32,10 @@
 #include <stdexcept>
 #include <vector>
 
+// @BL
+#include <map>
+#include <unordered_set>
+
 #include "champsim.h"
 #include "champsim_constants.h"
 #include "channel.h"
@@ -95,6 +99,11 @@ class O3_CPU : public champsim::operable
 {
 public:
   uint32_t cpu = 0;
+
+  // @BL
+  std::map<int, int> missed_branches = {}; // Used to collect info about missed branches
+  std::unordered_set<int> perfect_branches = {}; // Used to perfectly guess actually missed branches
+
 
   // cycle
   uint64_t begin_phase_cycle = 0;

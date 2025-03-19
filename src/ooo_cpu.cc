@@ -170,6 +170,10 @@ bool O3_CPU::do_predict_branch(ooo_model_instr& arch_instr)
     if (predicted_branch_target != arch_instr.branch_target
         || (((arch_instr.branch_type == BRANCH_CONDITIONAL) || (arch_instr.branch_type == BRANCH_OTHER))
             && arch_instr.branch_taken != arch_instr.branch_prediction)) { // conditional branches are re-evaluated at decode when the target is computed
+
+      // @BL - missed branch!
+      missed_branches[arch_instr.ip]++;
+
       sim_stats.total_rob_occupancy_at_branch_mispredict += std::size(ROB);
       sim_stats.branch_type_misses[arch_instr.branch_type]++;
       if (!warmup) {
