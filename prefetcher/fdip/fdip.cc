@@ -8,12 +8,12 @@
 #define MAX_PFETCHQ_ENTRIES 128
 #define MAX_RECENT_PFETCH 4
 
-std::deque<std::tuple<uint64_t, uint64_t, uint8_t>> prefetch_queue; // Storage: 64-bits * 48 (queue size) = 384 bytes
+std::deque<std::tuple<uint64_t, uint64_t, uint64_t>> prefetch_queue; // Storage: 64-bits * 48 (queue size) = 384 bytes
 std::deque<uint64_t> recent_prefetches;                             // Storage: 64-bits * 10 (queue size) = 80 bytes
 
 void CACHE::prefetcher_initialize() {}
 
-void CACHE::prefetcher_branch_operate(uint64_t ip, uint8_t branch_type, uint64_t branch_target, uint8_t size)
+void CACHE::prefetcher_branch_operate(uint64_t ip, uint8_t branch_type, uint64_t branch_target)
 {
   // assert(ip % 4 == 0 and branch_target % 4 == 0);
   uint64_t block_addr = ((branch_target >> LOG2_BLOCK_SIZE) << LOG2_BLOCK_SIZE);
@@ -25,7 +25,7 @@ void CACHE::prefetcher_branch_operate(uint64_t ip, uint8_t branch_type, uint64_t
   if (it == prefetch_queue.end()) {
     std::deque<uint64_t>::iterator it1 = std::find(recent_prefetches.begin(), recent_prefetches.end(), block_addr);
     if (it1 == recent_prefetches.end()) {
-      prefetch_queue.push_back({block_addr, branch_target, size});
+      prefetch_queue.push_back({block_addr, branch_target, 8 /*@BL?*/});
     }
     if (prefetch_queue.size() > MAX_PFETCHQ_ENTRIES) {
       prefetch_queue.pop_front();

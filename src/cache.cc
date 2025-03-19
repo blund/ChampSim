@@ -32,6 +32,14 @@
 #include "util/span.h"
 #include <fmt/core.h>
 
+bool CACHE::hit_test(uint64_t addr)
+{
+  auto [set_begin, set_end] = get_set_span(addr);
+  auto way =
+      std::find_if(set_begin, set_end, [match = addr >> OFFSET_BITS, shamt = OFFSET_BITS](const auto& entry) { return (entry.address >> shamt) == match; });
+  return way != set_end;
+}
+
 CACHE::tag_lookup_type::tag_lookup_type(request_type req, bool local_pref, bool skip)
     : address(req.address), v_address(req.v_address), data(req.data), ip(req.ip), instr_id(req.instr_id), pf_metadata(req.pf_metadata), cpu(req.cpu),
       type(req.type), prefetch_from_this(local_pref), skip_fill(skip), is_translated(req.is_translated), instr_depend_on_me(req.instr_depend_on_me)
