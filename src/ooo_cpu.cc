@@ -153,8 +153,6 @@ bool O3_CPU::do_predict_branch(ooo_model_instr& arch_instr)
   sim_stats.total_branch_types[arch_instr.branch_type]++;
   auto [predicted_branch_target, always_taken] = impl_btb_prediction(arch_instr.ip);
 
-
-
   arch_instr.branch_prediction = impl_predict_branch(arch_instr.ip) || always_taken;
   if (arch_instr.branch_prediction == 0)
     predicted_branch_target = 0;
@@ -164,15 +162,34 @@ bool O3_CPU::do_predict_branch(ooo_model_instr& arch_instr)
       fmt::print("[BRANCH] instr_id: {} ip: {:#x} taken: {}\n", arch_instr.instr_id, arch_instr.ip, arch_instr.branch_taken);
     }
 
+    // @BL - save the branch
+    auto it = branch_miss_info.find(arch_instr.ip);
+    if (it == branch_miss_info.end()) {
+      branch_miss_info[arch_instr.ip].type = arch_instr.branch_type;
+    }
+    branch_miss_info[arch_instr.ip].total++;
+
+
+
     // call code prefetcher every time the branch predictor is used
     l1i->impl_prefetcher_branch_operate(arch_instr.ip, arch_instr.branch_type, predicted_branch_target);
 
+    /*
+    // @BL - perfect branch prediciton
+    if (perfect_branches.find(arch_instr.ip) != perfect_branches.end()) {
+    predicted_branch_target = arch_instr.branch_target;
+    }
+    */
+
+    
+    // aggreger totalt her
+    
     if (predicted_branch_target != arch_instr.branch_target
         || (((arch_instr.branch_type == BRANCH_CONDITIONAL) || (arch_instr.branch_type == BRANCH_OTHER))
             && arch_instr.branch_taken != arch_instr.branch_prediction)) { // conditional branches are re-evaluated at decode when the target is computed
 
       // @BL - missed branch!
-      missed_branches[arch_instr.ip]++;
+      branch_miss_info[arch_instr.ip].misses++;
 
       sim_stats.total_rob_occupancy_at_branch_mispredict += std::size(ROB);
       sim_stats.branch_type_misses[arch_instr.branch_type]++;

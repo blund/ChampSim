@@ -141,6 +141,47 @@ int main(int argc, char** argv)
   fmt::print("\n*** ChampSim Multicore Out-of-Order Simulator ***\nWarmup Instructions: {}\nSimulation Instructions: {}\nNumber of CPUs: {}\nPage size: {}\n\n",
 	   phases.at(0).length, phases.at(1).length, std::size(gen_environment.cpu_view()), PAGE_SIZE);
 
+
+  // @BL - read list of missed branches to predict perfectly
+  {
+    O3_CPU& cpu = gen_environment.cpu_view()[0];
+
+    std::vector<int> all_missed_branches;
+
+    std::ifstream file{"/cluster/home/borgelu/master/library/champsim/20250319-1234_tage-scl/guess_correctly.txt"};
+    if (!file) {
+      puts("ERROR, could not read 'missed_branches.txt'");
+      exit(69);
+    }
+
+    std::string line;
+    int entries = 0;
+    while (std::getline(file, line)) {
+
+      std::istringstream iss(line);
+      std::string addr_str, count_str;
+
+      // Read the address (hex) and count (decimal), separated by ","
+      if (std::getline(iss, addr_str, ',')) {
+	int addr = std::stoi(addr_str);  // Parse address as hex
+	all_missed_branches.push_back(addr); // Store the pair
+      } else {
+	puts("ERROR, could not read 'missed_branches.txt'");
+	exit(69);
+      }
+      entries++;
+    }
+
+    file.close();
+
+    int thresh = (int)(0.005*entries);
+    for (int i = 0; i < thresh; i++) {
+      cpu.perfect_branches.insert(all_missed_branches[i]);
+    }
+  }
+
+
+  
   // @BL - her får vi ut en vektor av phase stats, som består i alle fasene vi har kjørt gjennom
   // programmets kjøretid
   std::vector<champsim::phase_stats> phase_stats = champsim::main(gen_environment, phases, traces, replacement);
@@ -150,6 +191,39 @@ int main(int argc, char** argv)
   printf("CPUs in phase_stats: %ld\n", phase_stats[0].roi_cpu_stats.size());
 
   printf("cache_stats len = %ld\n", phase_stats[0].snapshots[0].cache.size());
+
+
+  O3_CPU& cpu = gen_environment.cpu_view()[0];
+
+  // Convert map to vector of pairs (IP, Miss Count)
+  /*
+  std::vector<std::pair<int, int>> sorted_misses(cpu.missed_branches.begin(), cpu.missed_branches.end());
+
+  // Sort the vector by miss count in descending order
+  std::sort(sorted_misses.begin(), sorted_misses.end(),
+            [](const std::pair<int, int> &a, const std::pair<int, int> &b) {
+              return a.second > b.second; // Sort by miss count (higher first)
+            });
+
+  std::ofstream missed_branches_file{"missed_branches.txt"};
+  for (std::pair<int,int> pair : sorted_misses) {
+    missed_branches_file << pair.first;
+    missed_branches_file << ",";
+    missed_branches_file << pair.second;
+    missed_branches_file << "\n";
+    //printf("%x, %d\n", pair.first, pair.second);
+  }
+  missed_branches_file.close();
+  */
+  {
+    // Print branch info
+    std::ofstream out{"branch_info.txt"};
+    out << "key,total,misses,type\n";
+    for (const auto& [key, value] : cpu.branch_miss_info) {
+      out << key << "," << value.total << "," << value.misses << "," << static_cast<int>(value.type) << "\n";
+    }
+    out.close();
+  }
 
   std::ofstream output_file{output_path};
   for (auto& snapshot : phase_stats[0].snapshots) {

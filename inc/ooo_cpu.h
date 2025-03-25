@@ -94,6 +94,13 @@ struct LSQ_ENTRY {
   void finish(std::deque<ooo_model_instr>::iterator begin, std::deque<ooo_model_instr>::iterator end) const;
 };
 
+struct branch_data {
+  int total = 0;
+  int misses = 0;
+  uint8_t type = NOT_BRANCH;
+  // src
+};
+
 // cpu
 class O3_CPU : public champsim::operable
 {
@@ -101,7 +108,7 @@ public:
   uint32_t cpu = 0;
 
   // @BL
-  std::map<int, int> missed_branches = {}; // Used to collect info about missed branches
+  std::map<int, branch_data> branch_miss_info = {}; // Used to collect info about missed branches
   std::unordered_set<int> perfect_branches = {}; // Used to perfectly guess actually missed branches
 
 
