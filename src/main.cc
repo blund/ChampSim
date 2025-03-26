@@ -34,6 +34,8 @@
 #include <CLI/CLI.hpp>
 #include <fmt/core.h>
 
+#include <iomanip>
+
 namespace champsim
 {
   std::vector<phase_stats> main(environment& env, std::vector<phase_info>& phases,
@@ -143,6 +145,7 @@ int main(int argc, char** argv)
 
 
   // @BL - read list of missed branches to predict perfectly
+  /*
   {
     O3_CPU& cpu = gen_environment.cpu_view()[0];
 
@@ -163,11 +166,11 @@ int main(int argc, char** argv)
 
       // Read the address (hex) and count (decimal), separated by ","
       if (std::getline(iss, addr_str, ',')) {
-	int addr = std::stoi(addr_str);  // Parse address as hex
-	all_missed_branches.push_back(addr); // Store the pair
+        int addr = std::stoi(addr_str);  // Parse address as hex
+        all_missed_branches.push_back(addr); // Store the pair
       } else {
-	puts("ERROR, could not read 'missed_branches.txt'");
-	exit(69);
+        puts("ERROR, could not read 'missed_branches.txt'");
+        exit(69);
       }
       entries++;
     }
@@ -179,6 +182,7 @@ int main(int argc, char** argv)
       cpu.perfect_branches.insert(all_missed_branches[i]);
     }
   }
+  */
 
 
   
@@ -220,7 +224,11 @@ int main(int argc, char** argv)
     std::ofstream out{"branch_info.txt"};
     out << "key,total,misses,type\n";
     for (const auto& [key, value] : cpu.branch_miss_info) {
-      out << key << "," << value.total << "," << value.misses << "," << static_cast<int>(value.type) << "\n";
+      out << std::hex << key << std::dec
+          << ","
+          << value.total << ","
+          << value.misses
+	  << "," << static_cast<int>(value.type) << "\n";
     }
     out.close();
   }
