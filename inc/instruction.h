@@ -24,6 +24,8 @@
 #include <limits>
 #include <vector>
 
+#include "string"
+
 #include "trace_instruction.h"
 
 // branch types
@@ -37,6 +39,19 @@ enum branch_type {
   BRANCH_RETURN = 6,
   BRANCH_OTHER = 7
 };
+
+constexpr std::string_view branch_type_to_string(branch_type bt) {
+  switch (bt) {
+  case NOT_BRANCH:           return "NOT_BRANCH";
+  case BRANCH_DIRECT_JUMP:   return "BRANCH_DIRECT_JUMP";
+  case BRANCH_INDIRECT:      return "BRANCH_INDIRECT";
+  case BRANCH_CONDITIONAL:   return "BRANCH_CONDITIONAL";
+  case BRANCH_DIRECT_CALL:   return "BRANCH_DIRECT_CALL";
+  case BRANCH_INDIRECT_CALL: return "BRANCH_INDIRECT_CALL";
+  case BRANCH_RETURN:        return "BRANCH_RETURN";
+  case BRANCH_OTHER:         return "BRANCH_OTHER";
+  }
+}
 
 template<typename T, typename = void>
 constexpr bool has_interpreter_state_v = false;

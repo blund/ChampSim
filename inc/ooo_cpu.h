@@ -69,7 +69,7 @@ public:
 struct branch_data {
   int total = 0;
   int misses = 0;
-  uint8_t type = NOT_BRANCH;
+  branch_type type = NOT_BRANCH;
 };
 
 struct cpu_stats {

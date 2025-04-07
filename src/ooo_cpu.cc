@@ -33,8 +33,17 @@
 // @BL
 #include <fstream>
 #include <iostream>
+#include <nlohmann/json.hpp>
 
 std::chrono::seconds elapsed_time();
+
+// @BL
+std::string to_hex(uint64_t value) {
+    std::ostringstream oss;
+    oss << std::hex << value;
+    return oss.str();
+}
+
 
 long O3_CPU::operate()
 {
@@ -66,19 +75,26 @@ long O3_CPU::operate()
     last_order = order;
 
     // @BL - This is where we emit info about this section (snapshot)
-    printf(" ~~~ end of snapshot order %d (at instr %ld) ~~~ \n", order, num_retired);
-    printf("Branch miss entries: %ld\n", this->branch_miss_info.size());
+    printf(" [BL] ~~~ Dumping snapshot entry %d (at instr %ld) ~~~ \n", order, num_retired);
 
-    std::ofstream out{::fmt::format("out/branch_misses_{}.log", order)};
+    std::ofstream snapshot_file{::fmt::format("out/snapshot_{}.json", order)};
+    nlohmann::json branch_misses = nlohmann::json::array();
     for (const auto& [key, value] : this->branch_miss_info) {
-      out << std::hex << key << std::dec
-          << ","
-          << value.total << ","
-          << value.misses
-	  << "," << static_cast<int>(value.type) << "\n";
+      branch_misses.push_back({
+          {"pc", to_hex(key)},
+          {"total", value.total},
+          {"misses", value.misses},
+	  {"type", branch_type_to_string(value.type)},
+	});
     }
-    
-    // Reset the stats we are interested in on a per-snapshot-basis
+
+    nlohmann::json root;
+    root["branch_miss_info"] = branch_misses;
+
+    snapshot_file << root.dump(2);
+    snapshot_file.close();
+
+
     this->branch_miss_info = {};
   }
   
@@ -177,6 +193,7 @@ void do_stack_pointer_folding(ooo_model_instr& arch_instr)
 }
 } // namespace
 
+
 bool O3_CPU::do_predict_branch(ooo_model_instr& arch_instr)
 {
   bool stop_fetch = false;
@@ -196,7 +213,8 @@ bool O3_CPU::do_predict_branch(ooo_model_instr& arch_instr)
 
     auto it = branch_miss_info.find(arch_instr.ip);
     if (it == branch_miss_info.end()) {
-      branch_miss_info[arch_instr.ip].type = arch_instr.branch_type;
+      assert(arch_instr.branch_type >= NOT_BRANCH && arch_instr.branch_type <= BRANCH_OTHER);
+      branch_miss_info[arch_instr.ip].type = (branch_type)arch_instr.branch_type;
     }
     branch_miss_info[arch_instr.ip].total++;
 
