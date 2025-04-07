@@ -95,35 +95,6 @@ phase_stats do_phase(phase_info phase, environment& env,
 
       for (auto pkt_count = cpu.IN_QUEUE_SIZE - static_cast<long>(std::size(cpu.input_queue)); !trace.eof() && pkt_count > 0; --pkt_count) {
         cpu.input_queue.push_back(trace());
-
-	auto instr = cpu.input_queue.back();
-
-	if (instr.int_state && instr.int_state != int_state) {
-	  //printf(" -- switching state to %d\n", int_state);
-	  last_int_state = int_state;
-	  int_state = instr.int_state;
-	  state_changed = 1;
-	}
-	
-	// Store snapshot of statistics
-	if (!is_warmup) {
-	  auto cpu_stats = env.cpu_view()[0].get().sim_stats;
-
-	  std::vector<cache_stats> cache_stats;
-	  for (auto& cache : env.cache_view()) {
-	    auto cache_stat = cache.get().sim_stats;
-	    cache_stats.push_back(cache_stat);
-	  }
-
-	  if (state_changed) {
-	    // We have to manually set current instructions and cycles
-	    // since these are normally set at the end of a phase
-	    cpu_stats.end_instrs = cpu.num_retired;
-	    cpu_stats.end_cycles = cpu.current_cycle;
-	    state_changed = 0;
-	    stats.snapshots.push_back(snapshot{last_int_state, cpu_stats, cache_stats});
-	  }
-	}
       }
 
       // If any trace reaches EOF, terminate all phases
@@ -191,8 +162,6 @@ std::vector<phase_stats> main(environment& env, std::vector<phase_info>& phases,
     if (!phase.is_warmup)
       results.push_back(stats);
   }
-
-  results[0].snapshots.push_back(snapshot{IRRELEVANT, results[0].sim_cpu_stats[0], results[0].sim_cache_stats});
 
   return results;
 }

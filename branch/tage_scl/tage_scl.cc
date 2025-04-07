@@ -453,7 +453,7 @@ void TageSCL::SCLPredict(uint64_t pc) {
             // prediction and  high/medium confidence on TAGE
             //  but just uses 2 counters 0.3 % MPKI reduction
             if (!disableConfCounter){
-                if ((tageConf==HighConf)) {
+              if ((tageConf == HighConf)) {
                     if ((abs(LSUM) < THRES / 4)) {
                         scl_provider = prov_inter;
                     }

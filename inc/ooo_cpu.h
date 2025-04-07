@@ -65,6 +65,13 @@ public:
   bool issue_write(request_type packet);
 };
 
+// Data collected for each branch
+struct branch_data {
+  int total = 0;
+  int misses = 0;
+  uint8_t type = NOT_BRANCH;
+};
+
 struct cpu_stats {
   std::string name;
   uint64_t begin_instrs = 0, begin_cycles = 0;
@@ -76,6 +83,7 @@ struct cpu_stats {
 
   uint64_t instrs() const { return end_instrs - begin_instrs; }
   uint64_t cycles() const { return end_cycles - begin_cycles; }
+
 };
 
 struct LSQ_ENTRY {
@@ -94,22 +102,11 @@ struct LSQ_ENTRY {
   void finish(std::deque<ooo_model_instr>::iterator begin, std::deque<ooo_model_instr>::iterator end) const;
 };
 
-struct branch_data {
-  int total = 0;
-  int misses = 0;
-  uint8_t type = NOT_BRANCH;
-  // src
-};
-
 // cpu
 class O3_CPU : public champsim::operable
 {
 public:
   uint32_t cpu = 0;
-
-  // @BL
-  std::map<int, branch_data> branch_miss_info = {}; // Used to collect info about missed branches
-  std::unordered_set<int> perfect_branches = {}; // Used to perfectly guess actually missed branches
 
 
   // cycle
@@ -124,6 +121,9 @@ public:
   // instruction
   uint64_t num_retired = 0;
 
+  // @BL - we collect info about every branch for the region
+  std::map<int, branch_data> branch_miss_info = {};
+  
   bool show_heartbeat = true;
 
   using stats_type = cpu_stats;
