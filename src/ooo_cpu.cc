@@ -30,6 +30,10 @@
 #include <fmt/core.h>
 #include <fmt/ranges.h>
 
+// @BL
+#include <fstream>
+#include <iostream>
+
 std::chrono::seconds elapsed_time();
 
 long O3_CPU::operate()
@@ -51,8 +55,36 @@ long O3_CPU::operate()
   progress += check_dib();
   initialize_instruction();
 
+
+  // @BL - here we check the amount of instructions retired.
+  // We use this to dump a new snapshot of our stats every
+  // N instructions.
+  const int snapshot_size = 100000;
+  static int last_order = 0;
+  int order = num_retired / snapshot_size;
+  if (order > last_order) {
+    last_order = order;
+
+    // @BL - This is where we emit info about this section (snapshot)
+    printf(" ~~~ end of snapshot order %d (at instr %ld) ~~~ \n", order, num_retired);
+    printf("Branch miss entries: %ld\n", this->branch_miss_info.size());
+
+    std::ofstream out{::fmt::format("out/branch_misses_{}.log", order)};
+    for (const auto& [key, value] : this->branch_miss_info) {
+      out << std::hex << key << std::dec
+          << ","
+          << value.total << ","
+          << value.misses
+	  << "," << static_cast<int>(value.type) << "\n";
+    }
+    
+    // Reset the stats we are interested in on a per-snapshot-basis
+    this->branch_miss_info = {};
+  }
+  
   // heartbeat
   if (show_heartbeat && (num_retired >= next_print_instruction)) {
+
     auto heartbeat_instr{std::ceil(num_retired - last_heartbeat_instr)};
     auto heartbeat_cycle{std::ceil(current_cycle - last_heartbeat_cycle)};
 
@@ -162,12 +194,16 @@ bool O3_CPU::do_predict_branch(ooo_model_instr& arch_instr)
       fmt::print("[BRANCH] instr_id: {} ip: {:#x} taken: {}\n", arch_instr.instr_id, arch_instr.ip, arch_instr.branch_taken);
     }
 
-    // @BL - save the branch
     auto it = branch_miss_info.find(arch_instr.ip);
     if (it == branch_miss_info.end()) {
       branch_miss_info[arch_instr.ip].type = arch_instr.branch_type;
     }
     branch_miss_info[arch_instr.ip].total++;
+
+    // @BL - we write our branch info to the sim stats
+    /*
+    auto branch_miss_info = sim_stats.branch_miss_infos;
+    */
 
 
 
@@ -188,9 +224,9 @@ bool O3_CPU::do_predict_branch(ooo_model_instr& arch_instr)
         || (((arch_instr.branch_type == BRANCH_CONDITIONAL) || (arch_instr.branch_type == BRANCH_OTHER))
             && arch_instr.branch_taken != arch_instr.branch_prediction)) { // conditional branches are re-evaluated at decode when the target is computed
 
-      // @BL - missed branch!
+      // @BL - increment the misses for the current instruction
       branch_miss_info[arch_instr.ip].misses++;
-
+      
       sim_stats.total_rob_occupancy_at_branch_mispredict += std::size(ROB);
       sim_stats.branch_type_misses[arch_instr.branch_type]++;
       if (!warmup) {
