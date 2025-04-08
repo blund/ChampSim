@@ -98,21 +98,28 @@ long O3_CPU::operate()
     }
     root["branches"] = branches;
 
+
+    // Store the cpu stats for this snapshot
+    nlohmann::json cpu_stats = sim_stats;
+    root["cpu_stats"] = cpu_stats;
+
+
     // Store all the cache data for this snapshot
-    for (auto cache : caches) {
+    for (auto cache : this->caches) {
       CACHE& ref = cache.get();
       nlohmann::json cache_stats = ref.sim_stats;
       root[ref.sim_stats.name] = cache_stats;
     }
 
+    // Emit the snapshot file!
     snapshot_file << root.dump(2);
     snapshot_file.close();
 
-    // Reset branch info for next snapshot
+    // Reset all stats to get clean data for the next snapshot
     this->branch_miss_info = {};
+    this->sim_stats = {};
 
-    // Reset the cache stats for the next snapshot
-    for (auto cache : caches) {
+    for (auto cache : this->caches) {
       CACHE& ref = cache.get();
       std::string name = ref.sim_stats.name;
       ref.sim_stats = {};

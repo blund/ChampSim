@@ -59,3 +59,4 @@ public:
 
 // @BL - make this available outside of the namespace :)
 void to_json(nlohmann::json& j, const CACHE::stats_type stats);
+void to_json(nlohmann::json& j, const O3_CPU::stats_type stats);
