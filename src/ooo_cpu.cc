@@ -30,10 +30,12 @@
 #include <fmt/core.h>
 #include <fmt/ranges.h>
 
+
 // @BL
 #include <fstream>
 #include <iostream>
 #include <nlohmann/json.hpp>
+#include <stats_printer.h>
 
 std::chrono::seconds elapsed_time();
 
@@ -77,25 +79,45 @@ long O3_CPU::operate()
     // @BL - This is where we emit info about this section (snapshot)
     printf(" [BL] ~~~ Dumping snapshot entry %d (at instr %ld) ~~~ \n", order, num_retired);
 
+
+    // Create the file to output the snapshot info to
     std::ofstream snapshot_file{::fmt::format("out/snapshot_{}.json", order)};
-    nlohmann::json branch_misses = nlohmann::json::array();
+
+    // Create the root node for printing
+    nlohmann::json root;
+
+    // Store all the branches performed in this snapshot
+    nlohmann::json branches = nlohmann::json::array();
     for (const auto& [key, value] : this->branch_miss_info) {
-      branch_misses.push_back({
+      branches.push_back({
           {"pc", to_hex(key)},
           {"total", value.total},
           {"misses", value.misses},
 	  {"type", branch_type_to_string(value.type)},
 	});
     }
+    root["branches"] = branches;
 
-    nlohmann::json root;
-    root["branch_miss_info"] = branch_misses;
+    // Store all the cache data for this snapshot
+    for (auto cache : caches) {
+      CACHE& ref = cache.get();
+      nlohmann::json cache_stats = ref.sim_stats;
+      root[ref.sim_stats.name] = cache_stats;
+    }
 
     snapshot_file << root.dump(2);
     snapshot_file.close();
 
-
+    // Reset branch info for next snapshot
     this->branch_miss_info = {};
+
+    // Reset the cache stats for the next snapshot
+    for (auto cache : caches) {
+      CACHE& ref = cache.get();
+      std::string name = ref.sim_stats.name;
+      ref.sim_stats = {};
+      ref.sim_stats.name = name;
+    }
   }
   
   // heartbeat

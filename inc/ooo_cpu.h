@@ -106,8 +106,11 @@ struct LSQ_ENTRY {
 class O3_CPU : public champsim::operable
 {
 public:
-  uint32_t cpu = 0;
+  // @BL - we collect info about every branch for the region
+  std::map<int, branch_data> branch_miss_info = {};
+  std::vector<std::reference_wrapper<CACHE>> caches;
 
+  uint32_t cpu = 0;
 
   // cycle
   uint64_t begin_phase_cycle = 0;
@@ -121,8 +124,6 @@ public:
   // instruction
   uint64_t num_retired = 0;
 
-  // @BL - we collect info about every branch for the region
-  std::map<int, branch_data> branch_miss_info = {};
   
   bool show_heartbeat = true;
 

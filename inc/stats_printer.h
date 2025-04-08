@@ -22,6 +22,9 @@
 #include "ooo_cpu.h"
 #include "phase_info.h"
 
+// @BL
+#include <nlohmann/json.hpp>
+
 namespace champsim
 {
 class plain_printer
@@ -53,3 +56,6 @@ public:
   void print(std::vector<phase_stats>& stats);
 };
 } // namespace champsim
+
+// @BL - make this available outside of the namespace :)
+void to_json(nlohmann::json& j, const CACHE::stats_type stats);

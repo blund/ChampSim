@@ -87,7 +87,9 @@ phase_stats do_phase(phase_info phase, environment& env,
     // Read from trace
     for (O3_CPU& cpu : env.cpu_view()) {
 
-      int state_changed = 0;
+      // @BL - make a copy of the references to the various caches
+      cpu.caches = env.cache_view();
+
       // Check to see if we should use the replacement trace for the simulation run
       auto& trace = (!is_warmup && replacement.has_value())
 	? replacement.value()
