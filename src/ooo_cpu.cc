@@ -70,18 +70,18 @@ long O3_CPU::operate()
   // @BL - here we check the amount of instructions retired.
   // We use this to dump a new snapshot of our stats every
   // N instructions.
-  const int snapshot_size = 100000;
   static int last_order = 0;
-  int order = num_retired / snapshot_size;
+  int order = num_retired / this->snapshot_rate;
   if (order > last_order) {
     last_order = order;
 
     // @BL - This is where we emit info about this section (snapshot)
     printf(" [BL] ~~~ Dumping snapshot entry %d (at instr %ld) ~~~ \n", order, num_retired);
 
-
     // Create the file to output the snapshot info to
-    std::ofstream snapshot_file{::fmt::format("out/snapshot_{}.json", order)};
+    std::ofstream snapshot_file
+    {::fmt::format("{}/snapshot_{}.json",
+                    this->snapshot_folder, order)};
 
     // Create the root node for printing
     nlohmann::json root;

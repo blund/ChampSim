@@ -109,6 +109,8 @@ public:
   // @BL - we collect info about every branch for the region
   std::map<int, branch_data> branch_miss_info = {};
   std::vector<std::reference_wrapper<CACHE>> caches;
+  std::string snapshot_folder;
+  int snapshot_rate;
 
   uint32_t cpu = 0;
 

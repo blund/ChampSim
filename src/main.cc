@@ -69,13 +69,14 @@ int main(int argc, char** argv)
   bool knob_cloudsuite{false};
   uint64_t warmup_instructions = 0;
   uint64_t simulation_instructions = std::numeric_limits<uint64_t>::max();
-  uint64_t snapshot_rate = 100000;
   std::string json_file_name;
-  std::string branch_info_file_name;
   std::vector<std::string> trace_names;
   std::string replacement_trace_name;
   std::string output_path = "stats.csv";
 
+  std::string snapshot_folder;
+  uint64_t snapshot_rate = 1000000;
+  
   auto set_heartbeat_callback = [&](auto) {
     for (O3_CPU& cpu : gen_environment.cpu_view())
       cpu.show_heartbeat = false;
@@ -95,15 +96,16 @@ int main(int argc, char** argv)
   auto deprec_sim_instr_option =
       app.add_option("--simulation_instructions", simulation_instructions, "[deprecated] use --simulation-instructions instead")->excludes(sim_instr_option);
 
-  app.add_option("--snapshot-rate", snapshot_rate, "How many instructions should be executed between making stat snapshots");
-
   app.add_option("--replacement-trace", replacement_trace_name, "Optional trace to use for simulation, replacing original trace");
 
   auto json_option =
       app.add_option("--json", json_file_name, "The name of the file to receive JSON output. If no name is specified, stdout will be used")->expected(0, 1);
 
-  auto branch_info_option =
-      app.add_option("--branch_info", branch_info_file_name, "The name of the file to receive Branch Info. If no name is specified, branch_info.txt will be used")->expected(0, 1);
+  auto snapshot_folder_option = app.add_option("--snapshot-folder", snapshot_folder,
+                                           "Required. Where to output the snapshot files.")
+                                ->expected(1, 1);
+
+  app.add_option("--snapshot-rate", snapshot_rate, "How many instructions should be executed between making stat snapshots");
 
 
   app.add_option("traces", trace_names, "The paths to the traces")->required()->expected(NUM_CPUS)->check(CLI::ExistingFile);
@@ -112,6 +114,7 @@ int main(int argc, char** argv)
 
   const bool warmup_given = (warmup_instr_option->count() > 0) || (deprec_warmup_instr_option->count() > 0);
   const bool simulation_given = (sim_instr_option->count() > 0) || (deprec_sim_instr_option->count() > 0);
+  const bool snapshot_folder_given = (snapshot_folder_option->count() == 1);
 
   if (deprec_warmup_instr_option->count() > 0)
     fmt::print("WARNING: option --warmup_instructions is deprecated. Use --warmup-instructions instead.\n");
@@ -122,7 +125,16 @@ int main(int argc, char** argv)
 
   // @BL
   bool is_luajit = true;
- 
+
+  if (!snapshot_folder_given) {
+    puts("No snapshot folder given!");
+    return -1;
+  }
+
+  O3_CPU& cpu = gen_environment.cpu_view()[0];
+  cpu.snapshot_folder = snapshot_folder;
+  cpu.snapshot_rate = snapshot_rate;
+
   if (simulation_given && !warmup_given)
     warmup_instructions = simulation_instructions * 2 / 10;
 
