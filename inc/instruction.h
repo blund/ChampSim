@@ -54,10 +54,10 @@ constexpr std::string_view branch_type_to_string(branch_type bt) {
 }
 
 template<typename T, typename = void>
-constexpr bool has_interpreter_state_v = false;
+constexpr bool has_state_v = false;
 
 template<typename T>
-constexpr bool has_interpreter_state_v<T, std::void_t<decltype(std::declval<T>().int_state)>> = true;
+constexpr bool has_state_v<T, std::void_t<decltype(std::declval<T>().state)>> = true;
   
 
 struct ooo_model_instr {
@@ -70,7 +70,7 @@ struct ooo_model_instr {
   bool branch_prediction = 0;
   bool branch_mispredicted = 0; // A branch can be mispredicted even if the direction prediction is correct when the predicted target is not correct
 
-  interpreter_state int_state = ERR; // @BL - if parsing fails, it should show up as -1 by default
+  program_state state = ERR; // @BL - if parsing fails, it should show up as -1 by default
   
   std::array<uint8_t, 2> asid = {std::numeric_limits<uint8_t>::max(), std::numeric_limits<uint8_t>::max()};
 
@@ -101,8 +101,8 @@ private:
   ooo_model_instr(T instr, std::array<uint8_t, 2> local_asid) : ip(instr.ip), is_branch(instr.is_branch), branch_taken(instr.branch_taken), asid(local_asid)
   {
 
-    if constexpr (has_interpreter_state_v<T>) {
-      this->int_state = (interpreter_state) instr.int_state;
+    if constexpr (has_state_v<T>) {
+      this->state = (state) instr.state;
     } 
 
     std::remove_copy(std::begin(instr.destination_registers), std::end(instr.destination_registers), std::back_inserter(this->destination_registers), 0);

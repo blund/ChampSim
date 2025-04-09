@@ -36,8 +36,8 @@ auto start_time = std::chrono::steady_clock::now();
 std::chrono::seconds elapsed_time() { return std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - start_time); }
 
 
-interpreter_state int_state = IRRELEVANT;
-interpreter_state last_int_state = IRRELEVANT;
+interpreter_state int_state = STATE_IRRELEVANT;
+interpreter_state last_int_state = STATE_IRRELEVANT;
 namespace champsim
 {
 phase_stats do_phase(phase_info phase, environment& env,

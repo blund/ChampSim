@@ -18,12 +18,12 @@
 #define TRACE_INSTRUCTION_H
 
 #include <limits>
-enum interpreter_state {
+enum program_state {
   ERR  = -1,
-  IRRELEVANT  = 0,
-  INTERPRETER = 1,
-  JIT         = 2,
-  TRACING     = 3,
+  STATE_IRRELEVANT = 0,
+  STATE_INTERPRET,
+  STATE_JIT,
+  STATE_TRACE,
 };
 
 // special registers that help us identify branches
@@ -85,7 +85,7 @@ struct luajit_instr {
   unsigned long long destination_memory[NUM_INSTR_DESTINATIONS]; // output memory
   unsigned long long source_memory[NUM_INSTR_SOURCES];           // input memory
 
-  interpreter_state int_state;
+  program_state state;
 };
 
 #endif

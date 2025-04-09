@@ -25,9 +25,11 @@
 #include <string.h>
 #include <string>
 
+
 #include "../../inc/trace_instruction.h"
 #include "pin.H"
 #include "../../../LuaJIT/src/lj_bc.h"
+#include <assert.h>
 
 using trace_instr_format_t = luajit_instr;
 
@@ -39,9 +41,22 @@ UINT64 instrCount = 0;
 
 std::ofstream outfile;
 
-trace_instr_format_t curr_instr;
+trace_instr_format_t current_instr;
 
 ADDRINT base_address;
+
+typedef enum {
+  LJ_TRACE_IDLE,	/* Trace compiler idle. */
+  LJ_TRACE_ACTIVE = 0x10,
+  LJ_TRACE_RECORD,	/* Bytecode recording active. */
+  LJ_TRACE_RECORD_1ST,	/* Record 1st instruction, too. */
+  LJ_TRACE_START,	/* New trace started. */
+  LJ_TRACE_END,		/* End of trace. */
+  LJ_TRACE_ASM,		/* Assemble trace. */
+  LJ_TRACE_ERR		/* Trace aborted with error. */
+} TraceState;
+
+
 
 /* ===================================================================== */
 // Command line switches
@@ -79,11 +94,7 @@ INT32 Usage()
 
 // Callback for loaded images - to find the base and high of the program, and thus calculate offsets
 
-VOID RegisterTraceStart(ADDRINT address) {
-  //puts(" [tracer] - setting mode to TRACING");
-  curr_instr.int_state = TRACING;
-}
-
+/*
 VOID Image(IMG img, VOID* v)
 {
   // Store base address so we can identitify addresses
@@ -92,14 +103,15 @@ VOID Image(IMG img, VOID* v)
     //printf("based address: %lx\n", base_address);
   }
 }
+*/
 
 
-
+program_state last_program_state = STATE_IRRELEVANT;
 void ResetCurrentInstruction(VOID* ip)
 {
-  curr_instr = {};
-  curr_instr.ip = (unsigned long long int)ip;
-  curr_instr.int_state = IRRELEVANT;
+  current_instr = {};
+  current_instr.ip = (unsigned long long int)ip;
+  current_instr.state = last_program_state;
 }
 
 BOOL ShouldWrite()
@@ -111,14 +123,14 @@ BOOL ShouldWrite()
 void WriteCurrentInstruction()
 {
   typename decltype(outfile)::char_type buf[sizeof(trace_instr_format_t)];
-  std::memcpy(buf, &curr_instr, sizeof(trace_instr_format_t));
+  std::memcpy(buf, &current_instr, sizeof(trace_instr_format_t));
   outfile.write(buf, sizeof(trace_instr_format_t));
 }
 
 void BranchOrNot(UINT32 taken)
 {
-  curr_instr.is_branch = 1;
-  curr_instr.branch_taken = taken;
+  current_instr.is_branch = 1;
+  current_instr.branch_taken = taken;
 }
 
 template <typename T>
@@ -147,11 +159,15 @@ VOID MemoryReadStoreBaseAddress(ADDRINT addr) {
 // Instrumentation callbacks
 /* ===================================================================== */
 // @BL
-UINT64 dispatch_base = 0xc0de000fe0;
-VOID CheckIfDispatch(ADDRINT base, ADDRINT opcode) {
-  // @BL(TODO) - ensure that the ring buffer works correctly....
+UINT64 global_state_base = 0xc0de000000;
+UINT64 dispatch_base = global_state_base + 0xff0;
+UINT64 jit_state = global_state_base + 0x434; // See above
+VOID CheckIfDispatch(ADDRINT base, ADDRINT opcode)
+{
   if (base == dispatch_base) {
 
+  /*
+  // @BL(TODO) - ensure that the ring buffer works correctly....
     // find last addr read in the ring addr:
     //ADDRINT last_addr;
     int ring_end = (ring_index + 1) % 16;
@@ -164,7 +180,34 @@ VOID CheckIfDispatch(ADDRINT base, ADDRINT opcode) {
 	break;
       }
     }
+    */
 
+    /*
+      The offset from the GG_State to the Jit state is 0x434:
+
+      (gdb) p &(((GG_State*)0)->J).state
+      $18 = (TraceState *) 0x434
+
+      This can be used from anywhere, sice we know that the GG_State is at addr 0xc0de000000.
+      We exploit this during bytecode execution!
+    */
+    static UINT32 jstate_val;
+    PIN_SafeCopy(&jstate_val, (VOID*)(jit_state), sizeof(jstate_val));
+
+    assert(jstate_val == LJ_TRACE_IDLE || (jstate_val >= LJ_TRACE_ACTIVE && jstate_val <= LJ_TRACE_ERR));
+
+    if (jstate_val == LJ_TRACE_IDLE) current_instr.state = STATE_INTERPRET;
+    if (jstate_val != LJ_TRACE_IDLE) current_instr.state = STATE_TRACE;
+
+    /*
+    // @DEBUG
+    static UINT32 last_jstate_val;
+    if (jstate_val != last_jstate_val) {
+      last_jstate_val = jstate_val;
+      printf("new jit state: 0x%x\n", jstate_val);
+    }
+    */
+    
     switch(opcode) {
     case BC_JFORI:
     case BC_JFORL:
@@ -172,40 +215,40 @@ VOID CheckIfDispatch(ADDRINT base, ADDRINT opcode) {
     case BC_JLOOP:
     case BC_JFUNCF:
     case BC_JFUNCV:
-      // JIT code will be executed
-      //puts(" [tracer] - setting mode to JIT");
-      curr_instr.int_state = JIT;
+      // We enter a machine code region
+      // @NOTE - we will never end up here during tracing
+      current_instr.state = STATE_JIT;
       break;
     default:
       // Normal interpreter execution
+      // We are executing a bytecode. This might be tracing or interpreting.
       assert(opcode >= 0 && opcode <= 243); // Make sure the opcode is actually an opcode!
-      //puts(" [tracer] - setting mode to INTERPRETER");
-      curr_instr.int_state = INTERPRETER;
       break;
     }
+
+    // @NOTE
+    // We need the program state to be "sticky" to carry over to other instructions.
+    // We do this to know "where they come from",
+    // ie what the last state switch was before this instruction.
+
+    /*
+    // @DEBUG - used to ensure that state switching works properly
+    if (last_program_state != current_instr.state) {
+      printf("new program state: 0x%d\n", current_instr.state);
+      last_program_state = current_instr.state;
+    }
+    */
+
+    last_program_state = current_instr.state;
   }
 }
-
-VOID DetectedTracing(ADDRINT ip)
-{
-  //puts(" [tracer] - setting mode to TRACING");
-  curr_instr.int_state = TRACING;
-}
-
-ADDRINT target_address = 0x000000ec30;
-
 // Is called for every instruction and instruments reads and writes
 VOID Instruction(INS ins, VOID* v)
 {
   // begin each instruction with this function
   INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)ResetCurrentInstruction, IARG_INST_PTR, IARG_END);
 
-  if (INS_Address(ins) == base_address+target_address) {
-    INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)DetectedTracing,
-		   IARG_INST_PTR,  // Instruction pointer (address)
-		   IARG_END);
-  }
-  
+ 
   if (INS_IsMemoryRead(ins)) {
       REG base_reg  = INS_MemoryBaseReg(ins);
       if(REG_valid(base_reg)) {
@@ -215,7 +258,7 @@ VOID Instruction(INS ins, VOID* v)
 
       }
   }
-  
+
   // @BL - instrument branches to check if they are the vm jumping to the dispatch table
   if (INS_IsBranch(ins)) {
     if (INS_IsIndirectControlFlow(ins)) {
@@ -242,16 +285,16 @@ VOID Instruction(INS ins, VOID* v)
   UINT32 readRegCount = INS_MaxNumRRegs(ins);
   for (UINT32 i = 0; i < readRegCount; i++) {
     UINT32 regNum = INS_RegR(ins, i);
-    INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)WriteToSet<unsigned char>, IARG_PTR, curr_instr.source_registers, IARG_PTR,
-                   curr_instr.source_registers + NUM_INSTR_SOURCES, IARG_UINT32, regNum, IARG_END);
+    INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)WriteToSet<unsigned char>, IARG_PTR, current_instr.source_registers, IARG_PTR,
+                   current_instr.source_registers + NUM_INSTR_SOURCES, IARG_UINT32, regNum, IARG_END);
   }
 
   // instrument register writes
   UINT32 writeRegCount = INS_MaxNumWRegs(ins);
   for (UINT32 i = 0; i < writeRegCount; i++) {
     UINT32 regNum = INS_RegW(ins, i);
-    INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)WriteToSet<unsigned char>, IARG_PTR, curr_instr.destination_registers, IARG_PTR,
-                   curr_instr.destination_registers + NUM_INSTR_DESTINATIONS, IARG_UINT32, regNum, IARG_END);
+    INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)WriteToSet<unsigned char>, IARG_PTR, current_instr.destination_registers, IARG_PTR,
+                   current_instr.destination_registers + NUM_INSTR_DESTINATIONS, IARG_UINT32, regNum, IARG_END);
   }
 
   // instrument memory reads and writes
@@ -260,11 +303,11 @@ VOID Instruction(INS ins, VOID* v)
   // Iterate over each memory operand of the instruction.
   for (UINT32 memOp = 0; memOp < memOperands; memOp++) {
     if (INS_MemoryOperandIsRead(ins, memOp))
-      INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)WriteToSet<unsigned long long int>, IARG_PTR, curr_instr.source_memory, IARG_PTR,
-                     curr_instr.source_memory + NUM_INSTR_SOURCES, IARG_MEMORYOP_EA, memOp, IARG_END);
+      INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)WriteToSet<unsigned long long int>, IARG_PTR, current_instr.source_memory, IARG_PTR,
+                     current_instr.source_memory + NUM_INSTR_SOURCES, IARG_MEMORYOP_EA, memOp, IARG_END);
     if (INS_MemoryOperandIsWritten(ins, memOp))
-      INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)WriteToSet<unsigned long long int>, IARG_PTR, curr_instr.destination_memory, IARG_PTR,
-                     curr_instr.destination_memory + NUM_INSTR_DESTINATIONS, IARG_MEMORYOP_EA, memOp, IARG_END);
+      INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)WriteToSet<unsigned long long int>, IARG_PTR, current_instr.destination_memory, IARG_PTR,
+                     current_instr.destination_memory + NUM_INSTR_DESTINATIONS, IARG_MEMORYOP_EA, memOp, IARG_END);
   }
 
   // finalize each instruction with this function
@@ -303,9 +346,6 @@ int main(int argc, char* argv[])
     std::cout << "Couldn't open output trace file. Exiting." << std::endl;
     exit(1);
   }
-
-  // @BL - register function to instrument image
-  IMG_AddInstrumentFunction(Image, 0);
 
   // Register function to be called to instrument instructions
   INS_AddInstrumentFunction(Instruction, 0);
