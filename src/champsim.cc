@@ -36,14 +36,12 @@ auto start_time = std::chrono::steady_clock::now();
 std::chrono::seconds elapsed_time() { return std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - start_time); }
 
 
-interpreter_state int_state = STATE_IRRELEVANT;
-interpreter_state last_int_state = STATE_IRRELEVANT;
 namespace champsim
 {
 phase_stats do_phase(phase_info phase, environment& env,
 		     std::vector<tracereader>& traces, std::optional<tracereader>& replacement)
 {
-  auto [phase_name, is_warmup, length, trace_index, trace_names, snapshot_rate] = phase;
+  auto [phase_name, is_warmup, length, trace_index, trace_names] = phase;
   auto operables = env.operable_view();
 
   phase_stats stats;
@@ -145,7 +143,6 @@ phase_stats do_phase(phase_info phase, environment& env,
   std::transform(std::begin(dram.channels), std::end(dram.channels), std::back_inserter(stats.roi_dram_stats),
                  [](const DRAM_CHANNEL& chan) { return chan.roi_stats; });
 
-  printf(" -- snapshots before returning: %ld\n", stats.snapshots.size());
   return stats;
 }
 

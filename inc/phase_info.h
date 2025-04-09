@@ -30,17 +30,15 @@
 namespace champsim
 {
 
-struct phase_info {
-  std::string name;
-  bool is_warmup;
-  uint64_t length;
-  std::vector<std::size_t> trace_index;
-  std::vector<std::string> trace_names;
+  struct phase_info {
+    std::string name;
+    bool is_warmup;
+    uint64_t length;
+    std::vector<std::size_t> trace_index;
+    std::vector<std::string> trace_names;
+  };
 
-  uint64_t snapshot_rate;
-};
 
-  
   enum CACHE_TYPES {
     LLC = 0,
     DTLB,
@@ -51,34 +49,13 @@ struct phase_info {
     STLB,
   };
 
-  struct snapshot {
-
-  interpreter_state state;
-  cpu_stats cpu;
-
-    /*
-      @BL - NOTE! 
-      There are always 7 entries in the cache array, with the indexes corresponding to:
-      0 - LLC
-      1 - cpu0_DTLB
-      2 - cpu0_ITLB
-      3 - cpu0_L1D
-      4 - cpu0_L1I
-      5 - cpu0_L2C
-      6 - cpu0_STLB
-      */
-  std::vector<cache_stats> cache;
-};
-
-struct phase_stats {
-  std::string name;
-  std::vector<std::string> trace_names;
-  std::vector<O3_CPU::stats_type> roi_cpu_stats, sim_cpu_stats;
-  std::vector<CACHE::stats_type> roi_cache_stats, sim_cache_stats;
-  std::vector<DRAM_CHANNEL::stats_type> roi_dram_stats, sim_dram_stats;
-
-  std::vector<snapshot> snapshots;
-};
+  struct phase_stats {
+    std::string name;
+    std::vector<std::string> trace_names;
+    std::vector<O3_CPU::stats_type> roi_cpu_stats, sim_cpu_stats;
+    std::vector<CACHE::stats_type> roi_cache_stats, sim_cache_stats;
+    std::vector<DRAM_CHANNEL::stats_type> roi_dram_stats, sim_dram_stats;
+  };
 
 } // namespace champsim
 

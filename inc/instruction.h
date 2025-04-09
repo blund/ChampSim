@@ -102,7 +102,7 @@ private:
   {
 
     if constexpr (has_state_v<T>) {
-      this->state = (state) instr.state;
+      this->state = (program_state)instr.state;
     } 
 
     std::remove_copy(std::begin(instr.destination_registers), std::end(instr.destination_registers), std::back_inserter(this->destination_registers), 0);

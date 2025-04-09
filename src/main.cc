@@ -150,8 +150,8 @@ int main(int argc, char** argv)
   }
 
   std::vector<champsim::phase_info> phases{
-      {champsim::phase_info{"Warmup", true, warmup_instructions, std::vector<std::size_t>(std::size(trace_names), 0), trace_names, 0},
-       champsim::phase_info{"Simulation", false, simulation_instructions, std::vector<std::size_t>(std::size(trace_names), 0), trace_names, snapshot_rate}}};
+      {champsim::phase_info{"Warmup", true, warmup_instructions, std::vector<std::size_t>(std::size(trace_names), 0), trace_names},
+       champsim::phase_info{"Simulation", false, simulation_instructions, std::vector<std::size_t>(std::size(trace_names), 0), trace_names}}};
 
   for (auto& p : phases)
     std::iota(std::begin(p.trace_index), std::end(p.trace_index), 0);
