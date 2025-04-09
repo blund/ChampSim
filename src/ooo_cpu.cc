@@ -94,6 +94,7 @@ long O3_CPU::operate()
           {"total", value.total},
           {"misses", value.misses},
 	  {"type", branch_type_to_string(value.type)},
+	  {"state", program_state_to_string(value.state)},
 	});
     }
     root["branches"] = branches;
@@ -244,6 +245,7 @@ bool O3_CPU::do_predict_branch(ooo_model_instr& arch_instr)
     if (it == branch_miss_info.end()) {
       assert(arch_instr.branch_type >= NOT_BRANCH && arch_instr.branch_type <= BRANCH_OTHER);
       branch_miss_info[arch_instr.ip].type = (branch_type)arch_instr.branch_type;
+      branch_miss_info[arch_instr.ip].state = arch_instr.state;
     }
     branch_miss_info[arch_instr.ip].total++;
 

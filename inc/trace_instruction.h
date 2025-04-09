@@ -18,6 +18,8 @@
 #define TRACE_INSTRUCTION_H
 
 #include <limits>
+#include <string>
+
 enum program_state {
   ERR  = -1,
   STATE_IRRELEVANT = 0,
@@ -25,6 +27,17 @@ enum program_state {
   STATE_JIT,
   STATE_TRACE,
 };
+
+constexpr std::string_view program_state_to_string(program_state ps) {
+  switch (ps) {
+  case ERR: return "ERR";
+  case STATE_IRRELEVANT: return "STATE_IRRELEVANT";
+  case STATE_INTERPRET: return "STATE_INTERPRET";
+  case STATE_JIT: return "STATE_JIT";
+  case STATE_TRACE: return "STATE_TRACE";
+  }
+}
+
 
 // special registers that help us identify branches
 namespace champsim

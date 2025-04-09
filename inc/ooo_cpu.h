@@ -69,6 +69,7 @@ public:
 struct branch_data {
   int total = 0;
   int misses = 0;
+  program_state state = STATE_IRRELEVANT;
   branch_type type = NOT_BRANCH;
 };
 
