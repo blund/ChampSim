@@ -89,22 +89,20 @@ long O3_CPU::operate()
     // Store all the branches performed in this snapshot
     std::array<nlohmann::json, 4> branch_stats;
     for (auto& branch : branch_stats) {
-      branch = nlohmann::json::array();
+      branch = nlohmann::json::object();
     }
 
     for (auto state : {STATE_IRRELEVANT, STATE_INTERPRET, STATE_JIT, STATE_TRACE}) {
-      printf("program state: %d\n", state);
       for (const auto& [key, value] : branch_records[state]) {
-	branch_stats[state].push_back({
-	    {"pc", to_hex(key)},
+        branch_stats[state][to_hex(key)] = {
 	    {"total", value.total},
 	    {"misses", value.misses},
 	    {"type", branch_type_to_string(value.type)},
-	  });
+	  };
       }
     }
 
-    root["branch_records"]              = nlohmann::json();
+    root["branch_records"] = nlohmann::json();
     root["branch_records"]["jit"]       = branch_stats[STATE_JIT];
     root["branch_records"]["interpret"] = branch_stats[STATE_INTERPRET];
     root["branch_records"]["trace"]     = branch_stats[STATE_TRACE];
