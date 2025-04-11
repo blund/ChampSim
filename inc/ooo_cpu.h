@@ -108,7 +108,9 @@ class O3_CPU : public champsim::operable
 {
 public:
   // @BL - we collect info about every branch for the region
-  std::map<int, branch_data> branch_miss_info = {};
+  // These are sorted into which of the program states (jit, interpreter, trace) they come from
+  std::array<std::map<int, branch_data>, 4> branch_records = {};
+
   std::vector<std::reference_wrapper<CACHE>> caches;
   std::string snapshot_folder;
   int snapshot_rate;

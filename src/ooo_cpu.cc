@@ -87,23 +87,31 @@ long O3_CPU::operate()
     nlohmann::json root;
 
     // Store all the branches performed in this snapshot
-    nlohmann::json branches = nlohmann::json::array();
-    for (const auto& [key, value] : this->branch_miss_info) {
-      branches.push_back({
-          {"pc", to_hex(key)},
-          {"total", value.total},
-          {"misses", value.misses},
-	  {"type", branch_type_to_string(value.type)},
-	  {"state", program_state_to_string(value.state)},
-	});
+    std::array<nlohmann::json, 4> branch_stats;
+    for (auto& branch : branch_stats) {
+      branch = nlohmann::json::array();
     }
-    root["branches"] = branches;
 
+    for (auto state : {STATE_IRRELEVANT, STATE_INTERPRET, STATE_JIT, STATE_TRACE}) {
+      printf("program state: %d\n", state);
+      for (const auto& [key, value] : branch_records[state]) {
+	branch_stats[state].push_back({
+	    {"pc", to_hex(key)},
+	    {"total", value.total},
+	    {"misses", value.misses},
+	    {"type", branch_type_to_string(value.type)},
+	  });
+      }
+    }
+
+    root["branch_records"]              = nlohmann::json();
+    root["branch_records"]["jit"]       = branch_stats[STATE_JIT];
+    root["branch_records"]["interpret"] = branch_stats[STATE_INTERPRET];
+    root["branch_records"]["trace"]     = branch_stats[STATE_TRACE];
 
     // Store the cpu stats for this snapshot
     nlohmann::json cpu_stats = sim_stats;
     root["cpu_stats"] = cpu_stats;
-
 
     // Store all the cache data for this snapshot
     for (auto cache : this->caches) {
@@ -117,7 +125,10 @@ long O3_CPU::operate()
     snapshot_file.close();
 
     // Reset all stats to get clean data for the next snapshot
-    this->branch_miss_info = {};
+    for (auto& record : branch_records) {
+      record = {};
+    }
+
     this->sim_stats = {};
 
     for (auto cache : this->caches) {
@@ -241,13 +252,22 @@ bool O3_CPU::do_predict_branch(ooo_model_instr& arch_instr)
       fmt::print("[BRANCH] instr_id: {} ip: {:#x} taken: {}\n", arch_instr.instr_id, arch_instr.ip, arch_instr.branch_taken);
     }
 
-    auto it = branch_miss_info.find(arch_instr.ip);
-    if (it == branch_miss_info.end()) {
+    // @BL - insert the branch into its corresponding source
+
+    // Find the record correspoding to the program sate (irrelevant, jit, interpreter, trace)
+
+
+    auto& branch_record = branch_records[arch_instr.state];
+    auto it = branch_record.find(arch_instr.ip);
+    if (it == branch_record.end()) {
       assert(arch_instr.branch_type >= NOT_BRANCH && arch_instr.branch_type <= BRANCH_OTHER);
-      branch_miss_info[arch_instr.ip].type = (branch_type)arch_instr.branch_type;
-      branch_miss_info[arch_instr.ip].state = arch_instr.state;
+
+      auto& branch_info = branch_record[arch_instr.ip];
+
+      branch_info.type = (branch_type)arch_instr.branch_type;
+      branch_info.state = arch_instr.state;
     }
-    branch_miss_info[arch_instr.ip].total++;
+    branch_record[arch_instr.ip].total++;
 
     // @BL - we write our branch info to the sim stats
     /*
@@ -274,7 +294,8 @@ bool O3_CPU::do_predict_branch(ooo_model_instr& arch_instr)
             && arch_instr.branch_taken != arch_instr.branch_prediction)) { // conditional branches are re-evaluated at decode when the target is computed
 
       // @BL - increment the misses for the current instruction
-      branch_miss_info[arch_instr.ip].misses++;
+      branch_record[arch_instr.ip].misses++;
+      // printf("entries: %ld\n", branch_record.size());
       
       sim_stats.total_rob_occupancy_at_branch_mispredict += std::size(ROB);
       sim_stats.branch_type_misses[arch_instr.branch_type]++;
