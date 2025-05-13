@@ -102,6 +102,12 @@ long O3_CPU::operate()
       }
     }
 
+    root["instructions"] = nlohmann::json();
+    root["instructions"]["jit"]       = instruction_count[STATE_JIT];
+    root["instructions"]["interpret"] = instruction_count[STATE_INTERPRET];
+    root["instructions"]["trace"]     = instruction_count[STATE_TRACE];
+
+
     root["branch_records"] = nlohmann::json();
     root["branch_records"]["jit"]       = branch_stats[STATE_JIT];
     root["branch_records"]["interpret"] = branch_stats[STATE_INTERPRET];
@@ -251,10 +257,7 @@ bool O3_CPU::do_predict_branch(ooo_model_instr& arch_instr)
     }
 
     // @BL - insert the branch into its corresponding source
-
     // Find the record correspoding to the program sate (irrelevant, jit, interpreter, trace)
-
-
     auto& branch_record = branch_records[arch_instr.state];
     auto it = branch_record.find(arch_instr.ip);
     if (it == branch_record.end()) {
@@ -666,6 +669,9 @@ bool O3_CPU::execute_load(const LSQ_ENTRY& lq_entry)
 
 void O3_CPU::do_complete_execution(ooo_model_instr& instr)
 {
+  // @BL - increment instruction count for the state (jit, interpret, trace)
+  instruction_count[instr.state]++;
+
   for (auto dreg : instr.destination_registers) {
     auto begin = std::begin(reg_producers[dreg]);
     auto end = std::end(reg_producers[dreg]);

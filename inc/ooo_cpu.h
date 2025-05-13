@@ -111,6 +111,10 @@ public:
   // These are sorted into which of the program states (jit, interpreter, trace) they come from
   std::array<std::map<int, branch_data>, 4> branch_records = {};
 
+  // @BL - we use this a simple counter to record how many instructions are executed in total
+  // for each of the various states
+  std::array<int, 4> instruction_count = {};
+
   std::vector<std::reference_wrapper<CACHE>> caches;
   std::string snapshot_folder;
   int snapshot_rate;
