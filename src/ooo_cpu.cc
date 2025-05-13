@@ -107,7 +107,6 @@ long O3_CPU::operate()
     root["instructions"]["interpret"] = instruction_count[STATE_INTERPRET];
     root["instructions"]["trace"]     = instruction_count[STATE_TRACE];
 
-
     root["branch_records"] = nlohmann::json();
     root["branch_records"]["jit"]       = branch_stats[STATE_JIT];
     root["branch_records"]["interpret"] = branch_stats[STATE_INTERPRET];
@@ -131,6 +130,9 @@ long O3_CPU::operate()
     // Reset all stats to get clean data for the next snapshot
     for (auto& record : branch_records) {
       record = {};
+    }
+    for (auto& count : instruction_count) {
+      count = 0;
     }
 
     this->sim_stats = {};
