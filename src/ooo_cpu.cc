@@ -103,21 +103,26 @@ long O3_CPU::operate()
       }
     }
 
-    printf("%d\n", trace_state_count[21]);
-
     root["instructions"] = nlohmann::json();
     root["instructions"]["jit"]       = instruction_count[STATE_JIT];
     root["instructions"]["interpret"] = instruction_count[STATE_INTERPRET];
-    root["instructions"]["trace"]     = instruction_count[STATE_TRACE];
+    root["instructions"]["trace"] = instruction_count[STATE_TRACE];
 
     root["branch_records"] = nlohmann::json();
     root["branch_records"]["jit"]       = branch_stats[STATE_JIT];
     root["branch_records"]["interpret"] = branch_stats[STATE_INTERPRET];
     root["branch_records"]["trace"]     = branch_stats[STATE_TRACE];
 
+    root["trace_state"] = nlohmann::json();
+    root["trace_state"]["idle"]   = trace_state_count[LJ_TRACE_IDLE];
+    root["trace_state"]["record"] = trace_state_count[LJ_TRACE_RECORD];
+    root["trace_state"]["asm"]    = trace_state_count[LJ_TRACE_ASM];
+    root["trace_state"]["active"] = trace_state_count[LJ_TRACE_ACTIVE];
+
     // Store the cpu stats for this snapshot
     nlohmann::json cpu_stats = sim_stats;
     root["cpu_stats"] = cpu_stats;
+    root["cpu_stats"]["ipc"] = (float)sim_stats.instrs() / (float)sim_stats.cycles();
 
     // Store all the cache data for this snapshot
     for (auto cache : this->caches) {
@@ -134,7 +139,12 @@ long O3_CPU::operate()
     for (auto& record : branch_records) {
       record = {};
     }
+
     for (auto& count : instruction_count) {
+      count = 0;
+    }
+
+    for (auto& count : trace_state_count) {
       count = 0;
     }
 
