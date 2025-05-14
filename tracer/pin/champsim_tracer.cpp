@@ -45,19 +45,10 @@ trace_instr_format_t current_instr;
 
 ADDRINT base_address;
 
-typedef enum {
-  LJ_TRACE_IDLE,	/* Trace compiler idle. */
-  LJ_TRACE_ACTIVE = 0x10,
-  LJ_TRACE_RECORD,	/* Bytecode recording active. */
-  LJ_TRACE_RECORD_1ST,	/* Record 1st instruction, too. */
-  LJ_TRACE_START,	/* New trace started. */
-  LJ_TRACE_END,		/* End of trace. */
-  LJ_TRACE_ASM,		/* Assemble trace. */
-  LJ_TRACE_ERR		/* Trace aborted with error. */
-} TraceState;
 
-
-
+UINT64 global_state_base = 0xc0de000000;
+UINT64 dispatch_base = global_state_base + 0xff0;
+UINT64 jit_state = global_state_base + 0x434; // See above
 /* ===================================================================== */
 // Command line switches
 /* ===================================================================== */
@@ -112,6 +103,13 @@ void ResetCurrentInstruction(VOID* ip)
   current_instr = {};
   current_instr.ip = (unsigned long long int)ip;
   current_instr.state = last_program_state;
+
+  static UINT32 jstate_val;
+  PIN_SafeCopy(&jstate_val, (VOID*)(jit_state), sizeof(jstate_val));
+
+  current_instr.trace_state = (TraceState)jstate_val;
+  printf("%d\n", jstate_val);
+ 
 }
 
 BOOL ShouldWrite()
@@ -159,9 +157,7 @@ VOID MemoryReadStoreBaseAddress(ADDRINT addr) {
 // Instrumentation callbacks
 /* ===================================================================== */
 // @BL
-UINT64 global_state_base = 0xc0de000000;
-UINT64 dispatch_base = global_state_base + 0xff0;
-UINT64 jit_state = global_state_base + 0x434; // See above
+
 VOID CheckIfDispatch(ADDRINT base, ADDRINT opcode)
 {
   if (base == dispatch_base) {
@@ -195,7 +191,6 @@ VOID CheckIfDispatch(ADDRINT base, ADDRINT opcode)
     PIN_SafeCopy(&jstate_val, (VOID*)(jit_state), sizeof(jstate_val));
 
     assert(jstate_val == LJ_TRACE_IDLE || (jstate_val >= LJ_TRACE_ACTIVE && jstate_val <= LJ_TRACE_ERR));
-
     if (jstate_val == LJ_TRACE_IDLE) current_instr.state = STATE_INTERPRET;
     if (jstate_val != LJ_TRACE_IDLE) current_instr.state = STATE_TRACE;
 
@@ -248,6 +243,10 @@ VOID Instruction(INS ins, VOID* v)
   // begin each instruction with this function
   INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)ResetCurrentInstruction, IARG_INST_PTR, IARG_END);
 
+  static UINT32 jstate_val;
+  PIN_SafeCopy(&jstate_val, (VOID*)(jit_state), sizeof(jstate_val));
+
+  current_instr.trace_state = (TraceState)jstate_val;
  
   if (INS_IsMemoryRead(ins)) {
       REG base_reg  = INS_MemoryBaseReg(ins);
@@ -325,8 +324,7 @@ VOID Instruction(INS ins, VOID* v)
 VOID Fini(INT32 code, VOID* v) { outfile.close(); }
 
 /*!
- * The main procedure of the tool.
- * This function is called when the application image is loaded but not yet started.
+ * The main procedure of the tool. * This function is called when the application image is loaded but not yet started.
  * @param[in]   argc            total number of elements in the argv array
  * @param[in]   argv            array of command line arguments,
  *                              including pin -t <toolname> -- ...

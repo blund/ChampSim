@@ -74,6 +74,7 @@ long O3_CPU::operate()
   int order = num_retired / this->snapshot_rate;
   if (order > last_order) {
     last_order = order;
+    end_phase(0);
 
     // @BL - This is where we emit info about this section (snapshot)
     printf(" [BL] ~~~ Dumping snapshot entry %d (at instr %ld) ~~~ \n", order, num_retired);
@@ -101,6 +102,8 @@ long O3_CPU::operate()
 	  };
       }
     }
+
+    printf("%d\n", trace_state_count[21]);
 
     root["instructions"] = nlohmann::json();
     root["instructions"]["jit"]       = instruction_count[STATE_JIT];
@@ -143,6 +146,8 @@ long O3_CPU::operate()
       ref.sim_stats = {};
       ref.sim_stats.name = name;
     }
+
+    begin_phase();
   }
   
   // heartbeat
@@ -673,6 +678,7 @@ void O3_CPU::do_complete_execution(ooo_model_instr& instr)
 {
   // @BL - increment instruction count for the state (jit, interpret, trace)
   instruction_count[instr.state]++;
+  trace_state_count[instr.trace_state]++;
 
   for (auto dreg : instr.destination_registers) {
     auto begin = std::begin(reg_producers[dreg]);

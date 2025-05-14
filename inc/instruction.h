@@ -58,7 +58,13 @@ constexpr bool has_state_v = false;
 
 template<typename T>
 constexpr bool has_state_v<T, std::void_t<decltype(std::declval<T>().state)>> = true;
-  
+
+template<typename T, typename = void>
+constexpr bool has_trace_state_v = false;
+
+template<typename T>
+constexpr bool has_trace_state_v<T, std::void_t<decltype(std::declval<T>().trace_state)>> = true;
+ 
 
 struct ooo_model_instr {
   uint64_t instr_id = 0;
@@ -71,6 +77,7 @@ struct ooo_model_instr {
   bool branch_mispredicted = 0; // A branch can be mispredicted even if the direction prediction is correct when the predicted target is not correct
 
   program_state state = ERR; // @BL - if parsing fails, it should show up as -1 by default
+  TraceState trace_state = LJ_TRACE_IDLE; // @BL - if parsing fails, it should show up as -1 by default
   
   std::array<uint8_t, 2> asid = {std::numeric_limits<uint8_t>::max(), std::numeric_limits<uint8_t>::max()};
 
@@ -103,7 +110,12 @@ private:
 
     if constexpr (has_state_v<T>) {
       this->state = (program_state)instr.state;
+    }
+
+    if constexpr (has_trace_state_v<T>) {
+      this->trace_state = (TraceState)instr.trace_state;
     } 
+
 
     std::remove_copy(std::begin(instr.destination_registers), std::end(instr.destination_registers), std::back_inserter(this->destination_registers), 0);
     std::remove_copy(std::begin(instr.source_registers), std::end(instr.source_registers), std::back_inserter(this->source_registers), 0);

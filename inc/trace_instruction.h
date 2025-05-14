@@ -27,8 +27,8 @@ enum program_state {
   STATE_JIT,
   STATE_TRACE,
 };
-
-constexpr std::string_view program_state_to_string(program_state ps) {
+/*
+const char* program_state_to_string(program_state ps) {
   switch (ps) {
   case ERR: return "ERR";
   case STATE_IRRELEVANT: return "STATE_IRRELEVANT";
@@ -36,7 +36,9 @@ constexpr std::string_view program_state_to_string(program_state ps) {
   case STATE_JIT: return "STATE_JIT";
   case STATE_TRACE: return "STATE_TRACE";
   }
+  return "";
 }
+*/
 
 
 // special registers that help us identify branches
@@ -84,6 +86,17 @@ struct cloudsuite_instr {
   unsigned char asid[2];
 };
 
+typedef enum {
+  LJ_TRACE_IDLE,	/* Trace compiler idle. */
+  LJ_TRACE_ACTIVE = 0x10,
+  LJ_TRACE_RECORD,	/* Bytecode recording active. */
+  LJ_TRACE_RECORD_1ST,	/* Record 1st instruction, too. */
+  LJ_TRACE_START,	/* New trace started. */
+  LJ_TRACE_END,		/* End of trace. */
+  LJ_TRACE_ASM,		/* Assemble trace. */
+  LJ_TRACE_ERR		/* Trace aborted with error. */
+} TraceState;
+
 struct luajit_instr {
   // instruction pointer or PC (Program Counter)
   unsigned long long ip;
@@ -99,6 +112,7 @@ struct luajit_instr {
   unsigned long long source_memory[NUM_INSTR_SOURCES];           // input memory
 
   program_state state;
+  TraceState trace_state;
 };
 
 #endif
