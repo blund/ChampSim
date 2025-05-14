@@ -1,3 +1,4 @@
+
 /*
  * This file implements a basic Branch Target Buffer (BTB) structure.
  * It uses a set-associative BTB to predict the targets of non-return branches,
@@ -12,6 +13,8 @@
 
 #include "msl/lru_table.h"
 #include "ooo_cpu.h"
+
+#include "ittage_64KB.h"
 
 namespace
 {
@@ -48,12 +51,15 @@ std::map<O3_CPU*, std::deque<uint64_t>> RAS;
 std::map<O3_CPU*, std::array<uint64_t, CALL_SIZE_TRACKERS>> CALL_SIZE;
 } // namespace
 
+ittage_predictor* ittage;
+
 void O3_CPU::initialize_btb()
 {
   ::BTB.insert({this, champsim::msl::lru_table<btb_entry_t>{BTB_SET, BTB_WAY}});
   std::fill(std::begin(::INDIRECT_BTB[this]), std::end(::INDIRECT_BTB[this]), 0);
   std::fill(std::begin(::CALL_SIZE[this]), std::end(::CALL_SIZE[this]), 4);
   ::CONDITIONAL_HISTORY[this] = 0;
+  ittage = new ittage_predictor();
 }
 
 std::pair<uint64_t, uint8_t> O3_CPU::btb_prediction(uint64_t ip)
@@ -77,8 +83,9 @@ std::pair<uint64_t, uint8_t> O3_CPU::btb_prediction(uint64_t ip)
   }
 
   if (btb_entry->type == ::branch_info::INDIRECT) {
-    auto hash = (ip >> 2) ^ ::CONDITIONAL_HISTORY[this].to_ullong();
-    return {::INDIRECT_BTB[this][hash % std::size(::INDIRECT_BTB[this])], true};
+    // auto hash = (ip >> 2) ^ ::CONDITIONAL_HISTORY[this].to_ullong();
+    // return {::INDIRECT_BTB[this][hash % std::size(::INDIRECT_BTB[this])], true};
+    return std::make_pair(ittage->predict_brindirect(ip), true);
   }
 
   return {btb_entry->target, btb_entry->type != ::branch_info::CONDITIONAL};
@@ -91,6 +98,12 @@ void O3_CPU::update_btb(uint64_t ip, uint64_t branch_target, uint8_t taken, uint
     RAS[this].push_back(ip);
     if (std::size(RAS[this]) > RAS_SIZE)
       RAS[this].pop_front();
+  }
+
+  // update ittage history
+  if ((branch_type == BRANCH_INDIRECT) || (branch_type == BRANCH_INDIRECT_CALL)) {
+    ittage->update_brindirect(ip, branch_type, taken, branch_target);
+    ittage->fetch_history_update(ip, branch_type, taken, branch_target);
   }
 
   // updates for indirect branches
