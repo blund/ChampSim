@@ -162,47 +162,9 @@ VOID CheckIfDispatch(ADDRINT base, ADDRINT opcode)
 {
   if (base == dispatch_base) {
 
-  /*
-  // @BL(TODO) - ensure that the ring buffer works correctly....
-    // find last addr read in the ring addr:
-    //ADDRINT last_addr;
-    int ring_end = (ring_index + 1) % 16;
-    for (int i = ring_index; i % 16 != ring_end; i--) {
-      //printf(" -- %d, %d\n", i, ring_end);
-      ADDRINT addr = addr_ring[i%16];
-      if (addr != dispatch_base) {
-	//printf("%lx\n", addr);
-	//puts("bom!");
-	break;
-      }
-    }
-    */
+    // Assume the state is in interpreter mode
+    current_instr.state = STATE_INTERPRET;
 
-    /*
-      The offset from the GG_State to the Jit state is 0x434:
-
-      (gdb) p &(((GG_State*)0)->J).state
-      $18 = (TraceState *) 0x434
-
-      This can be used from anywhere, sice we know that the GG_State is at addr 0xc0de000000.
-      We exploit this during bytecode execution!
-    */
-    static UINT32 jstate_val;
-    PIN_SafeCopy(&jstate_val, (VOID*)(jit_state), sizeof(jstate_val));
-
-    assert(jstate_val == LJ_TRACE_IDLE || (jstate_val >= LJ_TRACE_ACTIVE && jstate_val <= LJ_TRACE_ERR));
-    if (jstate_val == LJ_TRACE_IDLE) current_instr.state = STATE_INTERPRET;
-    if (jstate_val != LJ_TRACE_IDLE) current_instr.state = STATE_TRACE;
-
-    /*
-    // @DEBUG
-    static UINT32 last_jstate_val;
-    if (jstate_val != last_jstate_val) {
-      last_jstate_val = jstate_val;
-      printf("new jit state: 0x%x\n", jstate_val);
-    }
-    */
-    
     switch(opcode) {
     case BC_JFORI:
     case BC_JFORL:
@@ -211,7 +173,6 @@ VOID CheckIfDispatch(ADDRINT base, ADDRINT opcode)
     case BC_JFUNCF:
     case BC_JFUNCV:
       // We enter a machine code region
-      // @NOTE - we will never end up here during tracing
       current_instr.state = STATE_JIT;
       break;
     default:
@@ -247,16 +208,6 @@ VOID Instruction(INS ins, VOID* v)
   PIN_SafeCopy(&jstate_val, (VOID*)(jit_state), sizeof(jstate_val));
 
   current_instr.trace_state = (TraceState)jstate_val;
- 
-  if (INS_IsMemoryRead(ins)) {
-      REG base_reg  = INS_MemoryBaseReg(ins);
-      if(REG_valid(base_reg)) {
-	INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)MemoryReadStoreBaseAddress,
-		       IARG_REG_VALUE, base_reg,
-		       IARG_END);
-
-      }
-  }
 
   // @BL - instrument branches to check if they are the vm jumping to the dispatch table
   if (INS_IsBranch(ins)) {
