@@ -63,6 +63,7 @@ constexpr std::string_view trace_state_to_string(TraceState ts) {
   case LJ_TRACE_END:        return "LJ_TRACE_END";
   case LJ_TRACE_ASM:        return "LJ_TRACE_ASM";
   case LJ_TRACE_ERR:        return "LJ_TRACE_ERR";
+  default:                  return "bad_state";
   }
 }
 
