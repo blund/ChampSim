@@ -53,6 +53,20 @@ constexpr std::string_view branch_type_to_string(branch_type bt) {
   }
 }
 
+constexpr std::string_view trace_state_to_string(TraceState ts) {
+  switch (ts) {
+  case LJ_TRACE_IDLE:       return "LJ_TRACE_IDLE";
+  case LJ_TRACE_ACTIVE:     return "LJ_TRACE_ACTIVE";
+  case LJ_TRACE_RECORD:     return "LJ_TRACE_RECORD";
+  case LJ_TRACE_RECORD_1ST: return "LJ_TRACE_RECORD_1ST";
+  case LJ_TRACE_START:      return "LJ_TRACE_START";
+  case LJ_TRACE_END:        return "LJ_TRACE_END";
+  case LJ_TRACE_ASM:        return "LJ_TRACE_ASM";
+  case LJ_TRACE_ERR:        return "LJ_TRACE_ERR";
+  }
+}
+
+
 template<typename T, typename = void>
 constexpr bool has_state_v = false;
 

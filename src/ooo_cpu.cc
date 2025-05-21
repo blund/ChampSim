@@ -30,7 +30,6 @@
 #include <fmt/core.h>
 #include <fmt/ranges.h>
 
-
 // @BL
 #include <fstream>
 #include <iostream>
@@ -93,12 +92,13 @@ long O3_CPU::operate()
       branch = nlohmann::json::object();
     }
 
-    for (auto state : {STATE_IRRELEVANT, STATE_INTERPRET, STATE_JIT, STATE_TRACE}) {
+    for (auto state : {STATE_IRRELEVANT, STATE_INTERPRET, STATE_JIT}) {
       for (const auto& [key, value] : branch_records[state]) {
         branch_stats[state][to_hex(key)] = {
 	    {"total", value.total},
 	    {"misses", value.misses},
 	    {"type", branch_type_to_string(value.type)},
+	    {"trace_state", trace_state_to_string(value.trace_state)},
 	  };
       }
     }
@@ -284,6 +284,7 @@ bool O3_CPU::do_predict_branch(ooo_model_instr& arch_instr)
 
       branch_info.type = (branch_type)arch_instr.branch_type;
       branch_info.state = arch_instr.state;
+      branch_info.trace_state = arch_instr.trace_state;
     }
     branch_record[arch_instr.ip].total++;
 

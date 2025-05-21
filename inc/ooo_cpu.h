@@ -70,6 +70,7 @@ struct branch_data {
   int total = 0;
   int misses = 0;
   program_state state = STATE_IRRELEVANT;
+  TraceState trace_state = LJ_TRACE_ERR;
   branch_type type = NOT_BRANCH;
 };
 
