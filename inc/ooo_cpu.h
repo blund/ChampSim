@@ -114,7 +114,7 @@ public:
   // @BL - we use this a simple counter to record how many instructions are executed in total
   // for each of the various states
   std::array<int, 4> instruction_count = {};
-  std::array<int, 22> trace_state_count = {}; // @BL - hacky, but they start a value with 0x10 and we just want to use it directly. In practice there are 8 addressable values here
+  std::array<int, 48> trace_state_count = {}; // @BL - hacky, but they start a value with 0x10 and we just want to use it directly. In practice there are 8 addressable values here
 
   std::vector<std::reference_wrapper<CACHE>> caches;
   std::string snapshot_folder;
