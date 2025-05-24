@@ -87,37 +87,32 @@ long O3_CPU::operate()
     nlohmann::json root;
 
     // Store all the branches performed in this snapshot
-    std::array<nlohmann::json, 4> branch_stats;
+    std::array<nlohmann::json, 5> branch_stats;
     for (auto& branch : branch_stats) {
       branch = nlohmann::json::object();
     }
 
-    for (auto state : {STATE_IRRELEVANT, STATE_INTERPRET, STATE_JIT}) {
+    for (auto state : {INTERPRET, JIT, TRACE, ASM}) {
       for (const auto& [key, value] : branch_records[state]) {
         branch_stats[state][to_hex(key)] = {
 	    {"total", value.total},
 	    {"misses", value.misses},
 	    {"type", branch_type_to_string(value.type)},
-	    {"trace_state", trace_state_to_string(value.trace_state)},
 	  };
       }
     }
 
     root["instructions"] = nlohmann::json();
-    root["instructions"]["jit"]       = instruction_count[STATE_JIT];
-    root["instructions"]["interpret"] = instruction_count[STATE_INTERPRET];
-    root["instructions"]["trace"] = instruction_count[STATE_TRACE];
+    root["instructions"]["jit"]       = instruction_count[JIT];
+    root["instructions"]["interpret"] = instruction_count[INTERPRET];
+    root["instructions"]["trace"]     = instruction_count[TRACE];
+    root["instructions"]["asm"]       = instruction_count[ASM];
 
     root["branch_records"] = nlohmann::json();
-    root["branch_records"]["jit"]       = branch_stats[STATE_JIT];
-    root["branch_records"]["interpret"] = branch_stats[STATE_INTERPRET];
-    root["branch_records"]["trace"]     = branch_stats[STATE_TRACE];
-
-    root["trace_state"] = nlohmann::json();
-    root["trace_state"]["idle"]   = trace_state_count[LJ_TRACE_IDLE];
-    root["trace_state"]["record"] = trace_state_count[LJ_TRACE_RECORD];
-    root["trace_state"]["asm"]    = trace_state_count[LJ_TRACE_ASM];
-    root["trace_state"]["active"] = trace_state_count[LJ_TRACE_ACTIVE];
+    root["branch_records"]["jit"]       = branch_stats[JIT];
+    root["branch_records"]["interpret"] = branch_stats[INTERPRET];
+    root["branch_records"]["trace"]     = branch_stats[TRACE];
+    root["branch_records"]["asm"]       = branch_stats[ASM];
 
     // Store the cpu stats for this snapshot
     nlohmann::json cpu_stats = sim_stats;
@@ -141,10 +136,6 @@ long O3_CPU::operate()
     }
 
     for (auto& count : instruction_count) {
-      count = 0;
-    }
-
-    for (auto& count : trace_state_count) {
       count = 0;
     }
 
@@ -275,7 +266,22 @@ bool O3_CPU::do_predict_branch(ooo_model_instr& arch_instr)
 
     // @BL - insert the branch into its corresponding source
     // Find the record correspoding to the program sate (irrelevant, jit, interpreter, trace)
-    auto& branch_record = branch_records[arch_instr.state];
+
+
+    //    1 == STATE_INTERPRET
+    //    2 == STATE_JIT
+    //    17 == LJ_TRACE_RECORD
+    //    21 == LJ_TRACE_ASM
+    /*
+    int state = arch_instr.state;
+    int trace_state = arch_instr.trace_state;
+
+    if (trace_state == LJ_TRACE_ASM || trace_state == LJ_TRACE_RECORD) {
+      state = trace_state;
+    }
+    */
+
+    auto& branch_record = branch_records[program_state(arch_instr)];
     auto it = branch_record.find(arch_instr.ip);
     if (it == branch_record.end()) {
       assert(arch_instr.branch_type >= NOT_BRANCH && arch_instr.branch_type <= BRANCH_OTHER);
@@ -283,8 +289,8 @@ bool O3_CPU::do_predict_branch(ooo_model_instr& arch_instr)
       auto& branch_info = branch_record[arch_instr.ip];
 
       branch_info.type = (branch_type)arch_instr.branch_type;
-      branch_info.state = arch_instr.state;
-      branch_info.trace_state = arch_instr.trace_state;
+      //branch_info.state = state;
+      // branch_info.trace_state = arch_instr.trace_state;
     }
     branch_record[arch_instr.ip].total++;
 
@@ -688,8 +694,8 @@ bool O3_CPU::execute_load(const LSQ_ENTRY& lq_entry)
 void O3_CPU::do_complete_execution(ooo_model_instr& instr)
 {
   // @BL - increment instruction count for the state (jit, interpret, trace)
-  instruction_count[instr.state]++;
-  trace_state_count[instr.trace_state]++;
+  instruction_count[program_state(instr)]++;
+  // trace_state_count[instr.trace_state]++;
 
   for (auto dreg : instr.destination_registers) {
     auto begin = std::begin(reg_producers[dreg]);

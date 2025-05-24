@@ -69,8 +69,8 @@ public:
 struct branch_data {
   int total = 0;
   int misses = 0;
-  program_state state = STATE_IRRELEVANT;
-  TraceState trace_state = LJ_TRACE_ERR;
+  int state = STATE_IRRELEVANT;
+  // TraceState trace_state = LJ_TRACE_ERR;
   branch_type type = NOT_BRANCH;
 };
 
@@ -104,18 +104,46 @@ struct LSQ_ENTRY {
   void finish(std::deque<ooo_model_instr>::iterator begin, std::deque<ooo_model_instr>::iterator end) const;
 };
 
+typedef enum {
+  INTERPRET = 0,
+  JIT,
+  TRACE,
+  ASM,
+  END = 4,
+} ProgramState;
+
 // cpu
 class O3_CPU : public champsim::operable
 {
 public:
   // @BL - we collect info about every branch for the region
   // These are sorted into which of the program states (jit, interpreter, trace) they come from
-  std::array<std::map<int, branch_data>, 4> branch_records = {};
 
+  // @BL - this is a helper function to help normalize the various info from
+  // trace state and interpreter state that we trace into a nice and ordered pattern.
+  // This is very hacky but we just need it to work for now.
+  int program_state(ooo_model_instr& instr)
+  {
+    assert(STATE_INTERPRET == 1);
+    assert(STATE_JIT == 2);
+    assert(LJ_TRACE_RECORD == 17);
+    assert(LJ_TRACE_ASM == 21);
+    // @NOTE - make sure we check trace_state first as this
+    // overrules instr_state
+    if (instr.trace_state == LJ_TRACE_RECORD) return TRACE;
+    if (instr.trace_state == LJ_TRACE_ASM) return ASM;
+    if (instr.state == STATE_INTERPRET) return INTERPRET;
+    if (instr.state == STATE_JIT) return JIT;
+    return END; // @TODO - this is bad :)
+  }
+  
+  std::array<std::map<int, branch_data>, 5> branch_records = {};
+
+  
   // @BL - we use this a simple counter to record how many instructions are executed in total
   // for each of the various states
-  std::array<int, 4> instruction_count = {};
-  std::array<int, 48> trace_state_count = {}; // @BL - hacky, but they start a value with 0x10 and we just want to use it directly. In practice there are 8 addressable values here
+  std::array<int, 5> instruction_count = {};
+  // std::array<int, 48> trace_state_count = {}; // @BL - hacky, but they start a value with 0x10 and we just want to use it directly. In practice there are 8 addressable values here
 
   std::vector<std::reference_wrapper<CACHE>> caches;
   std::string snapshot_folder;
